@@ -1,30 +1,24 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { 
-  Box, 
-  Button, 
   Container, 
+  Box, 
   Paper, 
-  TextField, 
-  Typography, 
   IconButton, 
   CircularProgress,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemAvatar,
-  Avatar,
-  Divider,
   useTheme,
+  Typography,
+  styled,
+  keyframes,
+  Avatar
 } from '@mui/material';
+import ChatHeader from './ChatHeader';
 import { 
   Mic as MicIcon, 
-  MicOff as MicOffIcon, 
-  Send as SendIcon,
-  Person as PersonIcon,
-  SmartToy as AssistantIcon,
+  MicOff as MicOffIcon,
   VolumeUp as VolumeUpIcon
 } from '@mui/icons-material';
+
 import axios from 'axios';
 
 interface Message {
@@ -32,7 +26,6 @@ interface Message {
   content: string;
 }
 
-// Extend the Window interface to include webkitSpeechRecognition
 declare global {
   interface Window {
     webkitSpeechRecognition: any;
@@ -40,17 +33,67 @@ declare global {
   }
 }
 
+// Animation for typing indicator
+const bounce = keyframes`
+  0%, 80%, 100% { 
+    transform: scale(0);
+    opacity: 0.5;
+  }  
+  40% { 
+    transform: scale(1);
+    opacity: 1;
+  }
+`;
+
+// Styled component for message bubbles
+const MessageBubble = styled(Box, {
+  shouldForwardProp: (prop) => prop !== 'isUser'
+})<{ isUser: boolean }>(({ theme, isUser }) => ({
+  position: 'relative',
+  maxWidth: '70%',
+  padding: '12px 16px',
+  borderRadius: isUser 
+    ? '18px 18px 4px 18px' 
+    : '18px 18px 18px 4px',
+  backgroundColor: isUser 
+    ? theme.palette.primary.main 
+    : theme.palette.grey[100],
+  color: isUser 
+    ? theme.palette.primary.contrastText 
+    : theme.palette.text.primary,
+  marginBottom: '8px',
+  alignSelf: isUser ? 'flex-end' : 'flex-start',
+  boxShadow: theme.shadows[1],
+  '&:after': {
+    content: '""',
+    position: 'absolute',
+    bottom: 0,
+    [isUser ? 'right' : 'left']: '-8px',
+    width: 0,
+    height: 0,
+    border: '8px solid transparent',
+    borderTopColor: isUser 
+      ? theme.palette.primary.main 
+      : theme.palette.grey[100],
+    borderBottom: 0,
+    borderRight: isUser ? 'none' : '8px solid transparent',
+    borderLeft: isUser ? '8px solid transparent' : 'none',
+    transform: isUser 
+      ? 'translateX(8px) translateY(8px) rotate(45deg)'
+      : 'translateX(-8px) translateY(8px) rotate(-45deg)'
+  }
+}));
+
 const ChatInterface: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: 'Hello! How can I assist you today? You can click the microphone to start speaking.' }
+    { role: 'assistant', content: 'Hello! Click the microphone to start speaking. I\'m here to help!' }
   ]);
-  const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const theme = useTheme();
   const recognitionRef = useRef<any>(null);
-  const { playAudio, isPlaying, currentPlayingId, stopAudio } = useAudioPlayer();
+  const { playAudio, isPlaying, currentPlayingId } = useAudioPlayer();
 
   // Initialize speech recognition
   useEffect(() => {
@@ -64,14 +107,24 @@ const ChatInterface: React.FC = () => {
 
       recognitionRef.current.onresult = (event: any) => {
         const transcript = event.results[0][0].transcript;
-        setInput(prev => prev + (prev ? ' ' : '') + transcript);
+        handleVoiceInput(transcript);
         setIsListening(false);
       };
 
       recognitionRef.current.onerror = (event: any) => {
         console.error('Speech recognition error', event.error);
         setIsListening(false);
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: 'Sorry, I had trouble understanding. Please try speaking again.'
+        }]);
       };
+    } else {
+      console.error('Speech recognition not supported');
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: 'Speech recognition is not supported in your browser. Please use Chrome or Edge.'
+      }]);
     }
   }, []);
 
@@ -81,28 +134,32 @@ const ChatInterface: React.FC = () => {
   }, [messages]);
 
   const toggleListening = () => {
-    if (!recognitionRef.current) {
-      alert('Speech recognition is not supported in your browser. Try using Chrome or Edge.');
-      return;
-    }
+    if (!recognitionRef.current) return;
 
     if (isListening) {
       recognitionRef.current.stop();
       setIsListening(false);
     } else {
-      recognitionRef.current.start();
-      setIsListening(true);
+      try {
+        recognitionRef.current.start();
+        setIsListening(true);
+      } catch (error) {
+        console.error('Error starting speech recognition:', error);
+        setIsListening(false);
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: 'Error accessing microphone. Please ensure you\'ve granted microphone permissions.'
+        }]);
+      }
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim()) return;
+  const handleVoiceInput = async (transcript: string) => {
+    if (!transcript.trim()) return;
 
-    const userMessage: Message = { role: 'user', content: input };
+    const userMessage: Message = { role: 'user', content: transcript };
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
-    setInput('');
     setIsLoading(true);
 
     try {
@@ -134,130 +191,188 @@ const ChatInterface: React.FC = () => {
     }
   };
 
+  const [avatarUrl, setAvatarUrl] = useState<string>('');
+  
+  // Generate a random avatar URL when component mounts
+  useEffect(() => {
+    const gender = Math.random() > 0.5 ? 'men' : 'women';
+    const userId = Math.floor(Math.random() * 100);
+    setAvatarUrl(`https://randomuser.me/api/portraits/${gender}/${userId}.jpg`);
+  }, []);
+
   return (
     <Container maxWidth="md" sx={{ height: '100vh', display: 'flex', flexDirection: 'column', py: 2 }}>
-      <Typography variant="h4" component="h1" gutterBottom align="center" sx={{ mb: 3 }}>
-        Voice AI Chat
-      </Typography>
+      <ChatHeader 
+        name="Training Agent"
+        avatarUrl={avatarUrl}
+      />
       
-      <Paper 
-        elevation={3} 
-        sx={{ 
-          flex: 1, 
-          display: 'flex', 
+      <Paper
+        sx={{
+          display: 'flex',
           flexDirection: 'column',
+          p: 2,
+          borderRadius: 4,
+          boxShadow: 3,
+          backgroundColor: theme.palette.background.paper,
+          flex: 1,
+          minHeight: 0,
           overflow: 'hidden',
-          mb: 2
         }}
       >
-        <List sx={{ flex: 1, overflow: 'auto', p: 2 }}>
+        {/* Messages container */}
+        <Box sx={{ flex: 1, overflowY: 'auto', mb: 2, pr: 1 }}>
           {messages.map((message, index) => (
-            <React.Fragment key={index}>
-              <ListItem 
-                alignItems="flex-start"
+            <Box
+              key={index}
+              sx={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: message.role === 'user' ? 'flex-end' : 'flex-start',
+                mb: 2,
+              }}
+            >
+              <Box
                 sx={{
-                  flexDirection: message.role === 'user' ? 'row-reverse' : 'row',
-                  textAlign: message.role === 'user' ? 'right' : 'left'
+                  display: 'flex',
+                  alignItems: 'flex-end',
+                  maxWidth: '90%',
                 }}
               >
-                <ListItemAvatar>
-                  <Avatar sx={{
-                    bgcolor: message.role === 'user' 
-                      ? theme.palette.primary.main 
-                      : theme.palette.secondary.main
-                  }}>
-                    {message.role === 'user' ? <PersonIcon /> : <AssistantIcon />}
-                  </Avatar>
-                </ListItemAvatar>
-                <Box sx={{ display: 'flex', alignItems: 'flex-start', width: '100%' }}>
-                  <ListItemText
-                    primary={
-                      <Typography 
-                        variant="body1" 
-                        component="div"
-                        sx={{
-                          display: 'inline-block',
-                          p: 1.5,
-                          borderRadius: 2,
-                          bgcolor: message.role === 'user' 
-                            ? theme.palette.primary.light 
-                            : theme.palette.grey[200],
-                          color: message.role === 'user' 
-                            ? theme.palette.primary.contrastText 
-                            : theme.palette.text.primary,
-                          maxWidth: 'calc(100% - 48px)',
-                          textAlign: 'left',
-                          wordBreak: 'break-word',
-                          whiteSpace: 'pre-wrap',
-                          mr: 1
-                        }}
-                      >
-                        {message.content}
-                      </Typography>
-                    }
+                {message.role === 'assistant' && (
+                  <Avatar 
+                    src={avatarUrl}
+                    sx={{ 
+                      width: 36, 
+                      height: 36, 
+                      mr: 1,
+                      border: `2px solid ${theme.palette.primary.main}`
+                    }}
                   />
+                )}
+                <MessageBubble 
+                  isUser={message.role === 'user'}
+                  sx={{
+                    ...(message.role === 'user' && {
+                      bgcolor: 'primary.main',
+                      color: 'primary.contrastText',
+                    }),
+                  }}
+                >
+                  {message.content}
                   {message.role === 'assistant' && (
-                    <IconButton 
-                      size="small" 
+                    <IconButton
+                      size="small"
                       onClick={() => playAudio(message.content, `msg-${index}`)}
                       disabled={isPlaying && currentPlayingId === `msg-${index}`}
-                      sx={{ 
-                        alignSelf: 'center',
-                        color: theme.palette.primary.main,
-                        '&:hover': {
-                          backgroundColor: 'rgba(25, 118, 210, 0.04)'
-                        }
+                      sx={{
+                        position: 'absolute',
+                        right: 4,
+                        bottom: 4,
+                        color: 'inherit',
+                        opacity: 0.7,
+                        '&:hover': { opacity: 1 },
                       }}
                     >
                       {isPlaying && currentPlayingId === `msg-${index}` ? (
-                        <CircularProgress size={20} />
+                        <CircularProgress size={16} color="inherit" />
                       ) : (
                         <VolumeUpIcon fontSize="small" />
                       )}
                     </IconButton>
                   )}
-                </Box>
-              </ListItem>
-              {index < messages.length - 1 && <Divider variant="inset" component="li" />}
-            </React.Fragment>
+                </MessageBubble>
+                {message.role === 'user' && (
+                  <Avatar 
+                    sx={{ 
+                      bgcolor: 'primary.main',
+                      color: 'primary.contrastText',
+                      ml: 1,
+                      width: 36,
+                      height: 36,
+                      fontSize: '1rem',
+                    }}
+                  >
+                    You
+                  </Avatar>
+                )}
+              </Box>
+            </Box>
           ))}
+          
           {isLoading && (
-            <Box display="flex" justifyContent="center" my={2}>
-              <CircularProgress size={24} />
+            <Box sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 0.5,
+              bgcolor: 'grey.100',
+              px: 2,
+              py: 1.5,
+              borderRadius: 4,
+            }}>
+              {[0, 1, 2].map((i) => (
+                <Box
+                  key={i}
+                  sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    bgcolor: 'text.secondary',
+                    animation: `${bounce} 1.4s infinite ease-in-out both`,
+                    animationDelay: `${i * 0.16}s`,
+                  }}
+                />
+              ))}
             </Box>
           )}
           <div ref={messagesEndRef} />
-        </List>
-      </Paper>
+        </Box>
 
-      <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', gap: 1 }}>
-        <TextField
-          fullWidth
-          variant="outlined"
-          placeholder="Type your message..."
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          multiline
-          maxRows={4}
-          sx={{ flex: 1 }}
-        />
-        <IconButton 
-          color={isListening ? 'secondary' : 'default'}
-          onClick={toggleListening}
-          sx={{ alignSelf: 'flex-end', height: '56px' }}
-        >
-          {isListening ? <MicOffIcon /> : <MicIcon />}
-        </IconButton>
-        <Button 
-          type="submit" 
-          variant="contained" 
-          color="primary"
-          disabled={!input.trim() || isLoading}
-          sx={{ alignSelf: 'flex-end', height: '56px' }}
-        >
-          <SendIcon />
-        </Button>
-      </Box>
+        {/* Voice input controls */}
+        <Box sx={{ 
+          display: 'flex', 
+          flexDirection: 'column',
+          alignItems: 'center',
+          pt: 2,
+          borderTop: `1px solid ${theme.palette.divider}`
+        }}>
+          <IconButton
+            onClick={toggleListening} 
+            color={isListening ? 'error' : 'primary'}
+            sx={{ 
+              width: 80,
+              height: 80,
+              bgcolor: isListening ? 'error.main' : 'primary.main',
+              '&:hover': {
+                bgcolor: isListening ? 'error.dark' : 'primary.dark',
+                transform: 'scale(1.05)',
+              },
+              transition: 'all 0.2s',
+              boxShadow: 3,
+              mb: 1,
+            }}
+          >
+            {isListening ? (
+              <MicOffIcon sx={{ color: 'white', fontSize: 40 }} />
+            ) : (
+              <MicIcon sx={{ color: 'white', fontSize: 40 }} />
+            )}
+          </IconButton>
+          {isListening && (
+            <Typography
+              variant="body2"
+              color="textSecondary"
+              align="center"
+              sx={{ mb: 1 }}
+            >
+              Listening... Speak now
+            </Typography>
+          )}
+          <Typography variant="caption" color="textSecondary" sx={{ textAlign: 'center', maxWidth: '80%' }}>
+            {isListening ? 'Click to stop' : 'Click and speak to chat'}
+          </Typography>
+        </Box>
+      </Paper>
     </Container>
   );
 };
