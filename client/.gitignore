@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# Ignore webm files
+*.webm
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

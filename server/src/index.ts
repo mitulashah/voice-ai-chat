@@ -1,18 +1,30 @@
-import express, { Express, Request, Response, NextFunction, RequestHandler } from 'express';
+import express, { Express, Request, Response, NextFunction, Router, RequestHandler } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import OpenAI from 'openai';
-import axios from 'axios';
-import { Readable } from 'stream';
 import * as sdk from 'microsoft-cognitiveservices-speech-sdk';
-import { v4 as uuidv4 } from 'uuid';
+import { processAudioForSpeechRecognition } from './speechService';
+import { PrompyLoader } from './prompts/promptyLoader';
+import { TemplateManager } from './prompts/templateManager';
+import * as fsExtra from 'fs-extra';
+import * as path from 'path';
+import * as fs from 'fs';
 
-// Extend the SpeechSynthesisResult interface
-declare module 'microsoft-cognitiveservices-speech-sdk' {
-  interface SpeechSynthesisResult {
-    audioData: ArrayBuffer;
-    errorDetails: string;
-  }
+// Type definitions
+type AsyncRequestHandler<T = any> = (
+  req: Request<any, any, T>,
+  res: Response,
+  next: NextFunction
+) => Promise<void>;
+
+interface AudioRecognitionRequest {
+  audioData: string;
+}
+
+interface TextSynthesisRequest {
+  text: string;
+  // Optional gender for voice synthesis ('male' | 'female')
+  voiceGender?: 'male' | 'female';
 }
 
 // Define types for request body
@@ -25,9 +37,23 @@ interface ChatRequest {
   messages: ChatMessage[];
 }
 
+interface TemplateInfo {
+  name: string;
+  description: string;
+  fileName: string;
+}
+
 declare module 'express-serve-static-core' {
   interface Request {
     user?: any;
+  }
+}
+
+// Extend the SpeechSynthesisResult interface
+declare module 'microsoft-cognitiveservices-speech-sdk' {
+  interface SpeechSynthesisResult {
+    audioData: ArrayBuffer;
+    errorDetails: string;
   }
 }
 
@@ -37,15 +63,15 @@ const app: Express = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
-app.use(cors<Request>());
-app.use(express.json());
-app.use(express.static('public'));
+app.use(cors());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Error handling middleware
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong!' });
-});
+// Error handler middleware
+const errorHandler = (err: Error, req: Request, res: Response, next: NextFunction) => {
+  console.error('Error:', err);
+  res.status(500).json({ error: err.message });
+};
 
 // Initialize OpenAI client
 let openai: OpenAI | null = null;
@@ -77,16 +103,26 @@ speechConfig.speechSynthesisVoiceName = 'en-US-JennyNeural';
 // Set the output format to 24KHz audio
 speechConfig.speechSynthesisOutputFormat = sdk.SpeechSynthesisOutputFormat.Audio24Khz160KBitRateMonoMp3;
 
-// Function to generate speech using Azure TTS
-export async function generateSpeech(text: string): Promise<Buffer> {
+// Function to generate speech using Azure TTS, with optional gender selection
+export async function generateSpeech(text: string, voiceGender?: 'male' | 'female'): Promise<Buffer> {
+  // Determine voice
+  const voiceName = voiceGender === 'male' ? 'en-US-AndrewNeural' : 'en-US-JennyNeural';
+  console.log('generateSpeech using voiceName:', voiceName);
   return new Promise((resolve, reject) => {
-    // Create a speech synthesizer
-    const speechSynthesizer = new sdk.SpeechSynthesizer(speechConfig);
+    // Create a new speech config per request to set voice gender
+    const config = sdk.SpeechConfig.fromSubscription(
+      process.env.AZURE_SPEECH_KEY || 'your-azure-speech-key',
+      process.env.AZURE_SPEECH_REGION || 'eastus'
+    );
+    // Select voice based on gender: male uses GuyNeural, female uses JennyNeural by default
+    config.speechSynthesisVoiceName = voiceName;
+    config.speechSynthesisOutputFormat = sdk.SpeechSynthesisOutputFormat.Audio24Khz160KBitRateMonoMp3;
+    const speechSynthesizer = new sdk.SpeechSynthesizer(config);
     
-    // Generate SSML with the text
+    // Generate SSML with the selected voice
     const ssml = `
       <speak version="1.0" xml:lang="en-US">
-        <voice name="${speechConfig.speechSynthesisVoiceName}">
+        <voice name="${voiceName}">
           ${text}
         </voice>
       </speak>
@@ -121,56 +157,151 @@ app.get('/api/health', ((req: Request, res: Response) => {
   res.json({ status: 'ok', message: 'Server is running' });
 }) as RequestHandler);
 
-// Chat endpoint
-app.post('/api/chat', (async (req: Request<{}, {}, ChatRequest>, res: Response) => {
+// Templates endpoint
+app.get('/api/templates', (async (req: Request, res: Response) => {
+  console.log('handleGetTemplates called');
   try {
-    const { messages } = req.body;
+    // Use process.cwd() to get the current working directory (server folder)
+    const promptsDir = path.join(__dirname, '..', 'src', 'prompts');
+    console.log('Looking for prompts in:', promptsDir);
+    console.log('Directory exists:', fs.existsSync(promptsDir));
     
-    if (!openai) {
-      return res.status(500).json({ error: 'Azure OpenAI not configured' });
+    const files = fs.readdirSync(promptsDir);
+    console.log('Files found:', files);
+    
+    // Filter for .prompty files only
+    const promptyFiles = files.filter(file => file.endsWith('.prompty'));
+    
+    const templates: any[] = [];
+    for (const file of promptyFiles) {
+      const templateName = path.basename(file, '.prompty');
+      try {
+        const { metadata, content } = PrompyLoader.loadTemplate(templateName);
+        
+        templates.push({
+          id: templateName,
+          name: metadata.name,
+          description: metadata.description,
+          prompt: content
+        });
+      } catch (error) {
+        console.warn(`Failed to load template ${file}:`, error);
+        // Continue with other templates even if one fails
+      }
     }
 
-    if (!process.env.AZURE_OPENAI_DEPLOYMENT) {
-      return res.status(500).json({ error: 'Azure OpenAI deployment not configured' });
-    }
-
-    const response = await openai.chat.completions.create({
-      model: process.env.AZURE_OPENAI_DEPLOYMENT,
-      messages,
-      max_tokens: 800,
+    res.json({
+      success: true,
+      templates: templates,
+      count: templates.length
     });
+  } catch (error) {
+    console.error('Failed to load templates:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to load available templates',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+}) as AsyncRequestHandler);
 
-    if (response.choices && response.choices[0] && response.choices[0].message) {
-      res.json(response.choices[0].message);
-    } else {
-      throw new Error('No response from OpenAI');
+const router = Router();
+
+// Speech recognition endpoint
+const handleSpeechRecognition: AsyncRequestHandler<AudioRecognitionRequest> = async (req, res) => {
+  try {
+    const { audioData } = req.body;
+    if (!audioData) {
+      res.status(400).json({ error: 'No audio data provided' });
+      return;
+    }
+
+    const result = await processAudioForSpeechRecognition(audioData);
+    res.json({ text: result });
+  } catch (error) {
+    console.error('Speech recognition error:', error);
+    res.status(500).json({ error: 'Speech recognition failed' });
+  }
+};
+
+// Chat completion endpoint
+const handleChatCompletion: AsyncRequestHandler<ChatRequest> = async (req, res) => {
+  try {
+    if (!openai) {
+      res.status(500).json({ error: 'OpenAI client not initialized' });
+      return;
+    }
+
+    const { messages } = req.body;    // Load and render the appropriate Prompty template based on context
+    try {
+      const { systemMessage, configuration } = TemplateManager.getContextualPrompt(messages);
+
+      // Prepare messages with system message from Prompty template
+      const messagesWithSystem: ChatMessage[] = [
+        { role: 'system', content: systemMessage },
+        ...messages
+      ];
+
+      const completion = await openai.chat.completions.create({
+        model: process.env.AZURE_OPENAI_MODEL || 'gpt-4',
+        messages: messagesWithSystem,
+        max_tokens: configuration.max_tokens || 800,
+        temperature: configuration.temperature || 0.7,
+        top_p: configuration.top_p || 0.95,
+        frequency_penalty: configuration.frequency_penalty || 0,
+        presence_penalty: configuration.presence_penalty || 0
+      });
+
+      res.json(completion.choices[0].message);
+    } catch (promptError) {
+      console.error('Prompty template error:', promptError);
+      // Fallback to original behavior without template
+      const completion = await openai.chat.completions.create({
+        model: process.env.AZURE_OPENAI_MODEL || 'gpt-4',
+        messages: messages,
+      });
+      res.json(completion.choices[0].message);
     }
   } catch (error) {
-    console.error('Error in chat endpoint:', error);
-    res.status(500).json({ error: 'An error occurred while processing your request' });
+    console.error('Chat completion error:', error);
+    // Fallback assistant response to avoid errors on client
+    res.json({ role: 'assistant', content: 'Sorry, I encountered an error processing your request. Please try again.' });
   }
-}) as RequestHandler);
+};
 
-// Audio generation endpoint
-app.post('/api/audio/speech', (async (req: Request<{}, {}, { text: string }>, res: Response) => {
+// Text-to-speech endpoint
+const handleTextToSpeech: AsyncRequestHandler<TextSynthesisRequest> = async (req, res) => {
   try {
-    const { text } = req.body;
+    const { text, voiceGender } = req.body;
+    console.log('TTS request received, voiceGender:', voiceGender);
     if (!text) {
-      return res.status(400).json({ error: 'Text is required' });
+      res.status(400).json({ error: 'No text provided' });
+      return;
     }
 
-    const audioBuffer = await generateSpeech(text);
-    
-    res.setHeader('Content-Type', 'audio/mpeg');
-    res.setHeader('Content-Length', audioBuffer.length);
+    const audioBuffer = await generateSpeech(text, voiceGender);
+    res.setHeader('Content-Type', 'audio/mp3');
     res.send(audioBuffer);
   } catch (error) {
-    console.error('Error in audio generation endpoint:', error);
-    res.status(500).json({ error: 'Failed to generate audio' });
+    console.error('Speech synthesis error:', error);
+    res.status(500).json({ error: 'Speech synthesis failed' });
   }
-}) as RequestHandler);
+};
+
+// Register routes
+router.post('/api/speech/recognize', express.json({ limit: '50mb' }), handleSpeechRecognition);
+router.post('/api/chat', handleChatCompletion);
+router.post('/api/speech/synthesize', handleTextToSpeech);
+
+// Use router
+app.use(router);
+
+// Error handling middleware
+app.use(errorHandler);
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+  console.log(`Server is running on port ${PORT}`);
+  console.log(`OpenAI client initialized: ${!!openai}`);
+  console.log(`Azure Speech config initialized: ${!!speechConfig}`);
 });

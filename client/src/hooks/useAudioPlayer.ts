@@ -3,7 +3,8 @@ import { useState, useCallback } from 'react';
 interface AudioPlayerState {
   isPlaying: boolean;
   currentPlayingId: string | null;
-  playAudio: (text: string, id: string) => Promise<void>;
+  // playAudio now accepts optional voiceGender (e.g. 'male' or 'female')
+  playAudio: (text: string, id: string, voiceGender?: string) => Promise<void>;
   stopAudio: () => void;
 }
 
@@ -12,7 +13,8 @@ export const useAudioPlayer = (): AudioPlayerState => {
   const [currentPlayingId, setCurrentPlayingId] = useState<string | null>(null);
   const [audioElement, setAudioElement] = useState<HTMLAudioElement | null>(null);
 
-  const playAudio = useCallback(async (text: string, id: string) => {
+  // Now accepts optional voiceGender to request male/female voice
+  const playAudio = useCallback(async (text: string, id: string, voiceGender?: string) => {
     try {
       // Stop any currently playing audio
       if (audioElement) {
@@ -25,12 +27,12 @@ export const useAudioPlayer = (): AudioPlayerState => {
       setCurrentPlayingId(id);
 
       // Call the backend to generate speech
-      const response = await fetch('http://localhost:5000/api/audio/speech', {
+      const response = await fetch('http://localhost:5000/api/speech/synthesize', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, voiceGender }),
       });
 
       if (!response.ok) {
