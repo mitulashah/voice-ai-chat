@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { useAzureSpeechRecognition } from '../hooks/useAzureSpeechRecognition';
 import { useRetry } from '../hooks/useRetry';
@@ -7,14 +7,16 @@ import {
   Paper,
   useTheme,
   Alert,
-  Snackbar
+  Snackbar,
+  Box,
+  Button
 } from '@mui/material';
 import ChatHeader from './ChatHeader';
 import axios from 'axios';
-import { useTemplate } from '../context/TemplateContext';
 import MessageList from './MessageList';
 import VoiceInputBar from './VoiceInputBar';
 import ExportDialog from './ExportDialog';
+import { useTemplate } from '../context/TemplateContext';
 
 interface Message {
   role: 'user' | 'assistant' | 'system';
@@ -23,26 +25,46 @@ interface Message {
 }
 
 const ChatInterface: React.FC = () => {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [exportJson, setExportJson] = useState<string | null>(null);
   const { currentTemplate } = useTemplate();
-
-  // Reset chat history when a new template is selected
-  useEffect(() => {
-    // Initialize or reset chat history with selected template's system message
-    if (currentTemplate) {
-      setMessages([{ role: 'system', content: currentTemplate.prompt, timestamp: Date.now() }]);
-    } else {
-      setMessages([]);
-    }
-  }, [currentTemplate]);
-
+  // Load persisted messages or start with system prompt
+  const [messages, setMessages] = useState<Message[]>(() => {
+    const saved = localStorage.getItem('chatMessages');
+    return saved ? (JSON.parse(saved) as Message[]) : [];
+  });
+  const [exportJson, setExportJson] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = React.useRef<HTMLDivElement>(null);
+  const messagesRef = React.useRef<Message[]>(messages);
   const theme = useTheme();
   const { playAudio, isPlaying, currentPlayingId } = useAudioPlayer();
   const { executeWithRetry } = useRetry({ maxAttempts: 3, delayMs: 1000 });
+
+  // Keep messagesRef in sync and persist to storage
+  useEffect(() => {
+    messagesRef.current = messages;
+    localStorage.setItem('chatMessages', JSON.stringify(messages));
+  }, [messages]);
+
+  // Seed the system prompt only on initial mount
+  useEffect(() => {
+    if (messages.length === 0 && currentTemplate) {
+      setMessages([{ role: 'system', content: currentTemplate.prompt, timestamp: Date.now() }]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // Update system prompt when the selected scenario/template changes
+  useEffect(() => {
+    if (!currentTemplate) return;
+    setMessages(prev => {
+      if (prev.length > 0 && prev[0].role === 'system') {
+        // Update existing system prompt content
+        return [{ role: 'system', content: currentTemplate.prompt, timestamp: prev[0].timestamp }, ...prev.slice(1)];
+      }
+      // Prepend system prompt if missing
+      return [{ role: 'system', content: currentTemplate.prompt, timestamp: Date.now() }, ...prev];
+    });
+  }, [currentTemplate?.id]);
 
   // Track timestamps and end conversation
   const handleEndConversation = () => {
@@ -56,24 +78,35 @@ const ChatInterface: React.FC = () => {
     };
     const jsonString = JSON.stringify(exportData, null, 2);
     setExportJson(jsonString);
+    // Reset to only the initial system prompt
+    if (currentTemplate) {
+      setMessages([{ role: 'system', content: currentTemplate.prompt, timestamp: Date.now() }]);
+    } else {
+      setMessages([]);
+    }
+  };
+  // Clear chat but keep only the system prompt
+  const handleClearChat = () => {
+    if (currentTemplate) {
+      setMessages([{ role: 'system', content: currentTemplate.prompt, timestamp: Date.now() }]);
+    } else {
+      setMessages([]);
+    }
   };
 
   const handleVoiceInput = async (transcript: string) => {
     if (!transcript.trim()) return;
 
     const userMessage: Message = { role: 'user', content: transcript, timestamp: Date.now() };
-    const updatedMessages = [...messages, userMessage];
-    setMessages(updatedMessages);
+    // Append user message
+    setMessages(prev => [...prev, userMessage]);
     setIsLoading(true);
     setErrorMessage(null);
 
     try {
       const response = await executeWithRetry(
         () => axios.post('http://localhost:5000/api/chat', {
-          messages: updatedMessages.map(msg => ({
-            role: msg.role,
-            content: msg.content
-          }))
+          messages: [...messages, userMessage].map(({ role, content }) => ({ role, content }))
         }),
         (error, attempt) => {
           console.error(`Attempt ${attempt} failed:`, error);
@@ -90,7 +123,7 @@ const ChatInterface: React.FC = () => {
         content: response.data.content,
         timestamp: Date.now()
       };
-
+      // Append assistant message
       setMessages(prev => [...prev, assistantMessage]);
       
       try {
@@ -159,7 +192,7 @@ const ChatInterface: React.FC = () => {
         name="Training Agent"
         avatarUrl={avatarUrl}
       />
-      <Paper
+       <Paper
         sx={{
           display: 'flex',
           flexDirection: 'column',
@@ -191,9 +224,30 @@ const ChatInterface: React.FC = () => {
         <VoiceInputBar
           isListening={isListening}
           toggleListening={toggleListening}
-          handleEndConversation={handleEndConversation}
         />
       </Paper>
+      {/* Button bar for conversation controls (outside chat panel) */}
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2, mb: 1 }}>
+        <Button
+          variant="outlined"
+          color="primary"
+          onClick={handleClearChat}
+          sx={{ textTransform: 'none', mr: 1 }}
+        >
+          Clear Chat
+        </Button>
+        <Button
+          variant="contained"
+          onClick={handleEndConversation}
+          sx={{
+            textTransform: 'none',
+            backgroundColor: '#FF7F50', // coral/peach
+            '&:hover': { backgroundColor: '#E06C47' }
+          }}
+        >
+          Evaluate Conversation
+        </Button>
+      </Box>
 
      <Snackbar
        open={Boolean(errorMessage)}

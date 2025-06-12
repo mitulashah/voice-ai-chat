@@ -1,6 +1,7 @@
 import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
 import ChatInterface from './components/ChatInterface';
 import { TemplateProvider } from './context/TemplateContext';
+import { ChatProvider } from './context/ChatContext';
 
 // Create a theme instance
 const theme = createTheme({
@@ -42,7 +43,9 @@ function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <TemplateProvider>
-        <ChatInterface />
+        <ChatProvider>
+          <ChatInterface />
+        </ChatProvider>
       </TemplateProvider>
     </ThemeProvider>
   )

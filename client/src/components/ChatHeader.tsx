@@ -50,13 +50,13 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   const defaultAvatar = (
     <Avatar
       sx={{
-        width: 112,
-        height: 112,
+        width: 90,
+        height: 90,
         bgcolor: theme.palette.primary.main,
         color: theme.palette.primary.contrastText,
         border: `3px solid ${theme.palette.primary.dark}`,
-        fontSize: '3.5rem',
-        mb: 2,
+        fontSize: '3rem',
+        mb: 1,
       }}
     >
       {name.charAt(0).toUpperCase()}
@@ -69,9 +69,9 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        py: 2,
-        px: 1,
-        gap: 1,
+        py: 1,
+        px: 0.5,
+        gap: 0.5,
         position: 'relative',
         zIndex: 10,
       }}
@@ -80,7 +80,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
       <IconButton
         aria-label="select agent template"
         onClick={handleMenuOpen}
-        sx={{ position: 'absolute', top: 8, right: 8 }}
+        sx={{ position: 'absolute', top: 4, right: 4 }}
       >
         <MenuIcon />
       </IconButton>
@@ -105,20 +105,15 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           src={randomAvatarUrl}
           alt={name}
           sx={{ 
-            width: 112, 
-            height: 112, 
-            mb: 2,
+            width: 90, 
+            height: 90, 
+            mb: 1,
             border: `3px solid ${theme.palette.primary.main}`,
             '& img': {
               objectFit: 'cover',
-              width: '100%',
-              height: '100%',
             }
           }}
-          onError={() => {
-            // Fallback to default avatar if image fails to load
-            setRandomAvatarUrl('');
-          }}
+          onError={() => setRandomAvatarUrl('')}
         />
       ) : (
         defaultAvatar

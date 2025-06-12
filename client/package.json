@@ -20,6 +20,7 @@
     "@types/react-router-dom": "^5.3.3",
     "axios": "^1.9.0",
     "framer-motion": "^12.16.0",
+    "microsoft-cognitiveservices-speech-sdk": "^1.44.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-error-boundary": "^6.0.0",

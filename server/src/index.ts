@@ -288,6 +288,67 @@ const handleTextToSpeech: AsyncRequestHandler<TextSynthesisRequest> = async (req
   }
 };
 
+// Text-to-speech streaming endpoint (real-time audio chunks)
+router.post('/api/speech/synthesize/stream', async (req, res) => {
+  try {
+    const { text, voiceGender } = req.body;
+    if (!text) {
+      res.status(400).json({ error: 'No text provided' });
+      return;
+    }
+    const voiceName = voiceGender === 'male' ? 'en-US-AndrewNeural' : 'en-US-JennyNeural';
+    const config = sdk.SpeechConfig.fromSubscription(
+      process.env.AZURE_SPEECH_KEY || 'your-azure-speech-key',
+      process.env.AZURE_SPEECH_REGION || 'eastus'
+    );
+    config.speechSynthesisVoiceName = voiceName;
+    config.speechSynthesisOutputFormat = sdk.SpeechSynthesisOutputFormat.Raw16Khz16BitMonoPcm;
+    res.setHeader('Content-Type', 'audio/wav');
+    res.setHeader('Transfer-Encoding', 'chunked');
+    const pushStream = sdk.AudioOutputStream.createPullStream();
+    const audioConfig = sdk.AudioConfig.fromStreamOutput(pushStream);
+    const synthesizer = new sdk.SpeechSynthesizer(config, audioConfig);
+    const ssml = `
+      <speak version="1.0" xml:lang="en-US">
+        <voice name="${voiceName}">
+          ${text}
+        </voice>
+      </speak>
+    `;
+    let responseEnded = false;
+    synthesizer.speakSsmlAsync(
+      ssml,
+      result => {
+        synthesizer.close();
+        // Do not call res.end() here; let the streaming loop handle it
+      },
+      error => {
+        synthesizer.close();
+        if (!responseEnded) {
+          responseEnded = true;
+          res.status(500).json({ error: 'Speech synthesis failed' });
+        }
+      }
+    );
+    const buffer = Buffer.alloc(4096);
+    (async function readAndSend() {
+      let bytesRead = await pushStream.read(buffer);
+      while (bytesRead > 0) {
+        if (!responseEnded) {
+          res.write(buffer.slice(0, bytesRead));
+        }
+        bytesRead = await pushStream.read(buffer);
+      }
+      if (!responseEnded) {
+        responseEnded = true;
+        res.end();
+      }
+    })();
+  } catch (error) {
+    res.status(500).json({ error: 'Speech synthesis streaming failed' });
+  }
+});
+
 // Register routes
 router.post('/api/speech/recognize', express.json({ limit: '50mb' }), handleSpeechRecognition);
 router.post('/api/chat', handleChatCompletion);

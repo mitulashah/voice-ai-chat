@@ -22,25 +22,9 @@ const MessageBubble = styled(Box, {
   marginBottom: '8px',
   alignSelf: isUser ? 'flex-end' : 'flex-start',
   boxShadow: theme.shadows[1],
-  fontSize: '0.78em',
-  '&:after': isUser || false ? {} : {
-    content: '""',
-    position: 'absolute',
-    bottom: 0,
-    [isUser ? 'right' : 'left']: '-8px',
-    width: 0,
-    height: 0,
-    border: '8px solid transparent',
-    borderTopColor: isUser
-      ? theme.palette.primary.main
-      : theme.palette.grey[100],
-    borderBottom: 0,
-    borderRight: isUser ? 'none' : '8px solid transparent',
-    borderLeft: isUser ? '8px solid transparent' : 'none',
-    transform: isUser
-      ? 'translateX(8px) translateY(8px) rotate(45deg)'
-      : 'translateX(-8px) translateY(8px) rotate(-45deg)',
-  },
+  fontSize: '0.95em',
+  wordBreak: 'break-word',
+  textAlign: 'left',
 }));
 
 const SystemPromptBar = styled(Box)(({ theme }) => ({
@@ -90,7 +74,7 @@ const MessageList: React.FC<MessageListProps> = ({
   const theme = useTheme();
 
   return (
-    <Box sx={{ flex: 1, overflowY: 'auto', mb: 1, pr: 0.5 }}>
+    <Box sx={{ flex: 1, overflowY: 'auto', pr: 0.5 }}>
       {messages.map((message, index) => {
         if (message.role === 'system') {
           const isExpanded = expandedSystemIndexes.has(index);
@@ -138,6 +122,7 @@ const MessageList: React.FC<MessageListProps> = ({
               flexDirection: 'row',
               justifyContent: message.role === 'user' ? 'flex-end' : 'flex-start',
               mb: 1.2,
+              width: '100%'
             }}
           >
             <Box
@@ -167,8 +152,8 @@ const MessageList: React.FC<MessageListProps> = ({
                   ...(message.role === 'user' && {
                     bgcolor: 'primary.main',
                     color: 'primary.contrastText',
+                    ml: 'auto',  // push bubble to right
                   }),
-                  mx: message.role === 'user' ? 0 : 0,
                 }}
               >
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
@@ -246,6 +231,7 @@ const MessageList: React.FC<MessageListProps> = ({
           ))}
         </Box>
       )}
+      {/* anchor element for auto-scrolling */}
       <div ref={messagesEndRef} />
     </Box>
   );

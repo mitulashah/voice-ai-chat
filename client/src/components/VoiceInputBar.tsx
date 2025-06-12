@@ -1,18 +1,13 @@
 import React from 'react';
-import { Box, IconButton, Typography, Button, useTheme } from '@mui/material';
+import { Box, IconButton, Typography, useTheme } from '@mui/material';
 import { Mic as MicIcon, MicOff as MicOffIcon } from '@mui/icons-material';
 
 interface VoiceInputBarProps {
   isListening: boolean;
   toggleListening: () => void;
-  handleEndConversation: () => void;
 }
 
-const VoiceInputBar: React.FC<VoiceInputBarProps> = ({
-  isListening,
-  toggleListening,
-  handleEndConversation,
-}) => {
+const VoiceInputBar: React.FC<VoiceInputBarProps> = ({ isListening, toggleListening }) => {
   const theme = useTheme();
   return (
     <Box sx={{ 
@@ -58,9 +53,6 @@ const VoiceInputBar: React.FC<VoiceInputBarProps> = ({
       <Typography variant="caption" color="textSecondary" sx={{ textAlign: 'center', maxWidth: '80%', fontSize: '0.85em' }}>
         {isListening ? 'Click to stop' : 'Click and speak to chat'}
       </Typography>
-      <Button variant="contained" color="secondary" onClick={handleEndConversation} sx={{ mt: 0.7, fontSize: '0.85em', py: 0.5, px: 1.5, minWidth: 0 }}>
-        EVALUATE CONVERSATION
-      </Button>
     </Box>
   );
 };
