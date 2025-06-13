@@ -11,6 +11,7 @@ import {
   Box,
   Button
 } from '@mui/material';
+import MenuBar from './MenuBar';
 import ChatHeader from './ChatHeader';
 import axios from 'axios';
 import MessageList from './MessageList';
@@ -186,8 +187,10 @@ const ChatInterface: React.FC = () => {
   // Track which system messages are expanded
   const [expandedSystemIndexes, setExpandedSystemIndexes] = useState<Set<number>>(new Set());
 
+  // Render the expandable menu bar and chat header
   return (
     <Container maxWidth="md" sx={{ height: '100vh', display: 'flex', flexDirection: 'column', py: 2 }}>
+      <MenuBar />
       <ChatHeader 
         name="Training Agent"
         avatarUrl={avatarUrl}
@@ -230,9 +233,19 @@ const ChatInterface: React.FC = () => {
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2, mb: 1 }}>
         <Button
           variant="outlined"
-          color="primary"
+          color="inherit"
           onClick={handleClearChat}
-          sx={{ textTransform: 'none', mr: 1 }}
+          sx={{
+            textTransform: 'none',
+            mr: 1,
+            color: 'grey.700',
+            borderColor: 'grey.400',
+            '&:hover': {
+              borderColor: 'grey.600',
+              backgroundColor: 'grey.100',
+              color: 'grey.900',
+            },
+          }}
         >
           Clear Chat
         </Button>

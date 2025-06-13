@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Avatar, useTheme, IconButton, Menu, MenuItem } from '@mui/material';
-import MenuIcon from '@mui/icons-material/Menu';
+import { Box, Typography, Avatar, useTheme } from '@mui/material';
 import { useTemplate } from '../context/TemplateContext';
-import type { Template } from '../context/TemplateContext';
 
 // Generate a random user ID for avatar
 const getRandomUserId = () => Math.floor(Math.random() * 1000);
@@ -19,10 +17,9 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   const [randomAvatarUrl, setRandomAvatarUrl] = useState<string>('');
   // Determine which TTS voice will be used based on avatar gender
   const voiceName = randomAvatarUrl.includes('/men/') ? 'AndrewNeural' : 'JennyNeural';
-  const { templates, setCurrentTemplate, currentTemplate } = useTemplate();
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const menuOpen = Boolean(anchorEl);
+  const { currentTemplate } = useTemplate();
   const displayName = currentTemplate?.name || name;
+  const theme = useTheme();
   
   useEffect(() => {
     // Use the provided avatarUrl or generate a random one
@@ -36,15 +33,6 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
       setRandomAvatarUrl(`https://randomuser.me/api/portraits/${gender}/${userId}.jpg?t=${timestamp}`);
     }
   }, [avatarUrl]);
-  const handleMenuOpen = (e: React.MouseEvent<HTMLElement>) => {
-    setAnchorEl(e.currentTarget);
-  };
-  const handleMenuClose = () => setAnchorEl(null);
-  const handleSelect = (template: Template) => {
-    setCurrentTemplate(template);
-    handleMenuClose();
-  };
-  const theme = useTheme();
   
   // Fallback to a default avatar if no URL is provided
   const defaultAvatar = (
@@ -76,69 +64,45 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
         zIndex: 10,
       }}
     >
-      {/* Hamburger menu for selecting agent templates */}
-      <IconButton
-        aria-label="select agent template"
-        onClick={handleMenuOpen}
-        sx={{ position: 'absolute', top: 4, right: 4 }}
-      >
-        <MenuIcon />
-      </IconButton>
-      <Menu
-        anchorEl={anchorEl}
-        open={menuOpen}
-        onClose={handleMenuClose}
-      >
-        {templates.map((t, index) => (
-          <MenuItem
-            key={`${t.id}-${index}`}
-            selected={currentTemplate?.id === t.id}
-            onClick={() => handleSelect(t)}
-          >
-            {t.name}
-          </MenuItem>
-        ))}
-      </Menu>
-   
-      {randomAvatarUrl ? (
-        <Avatar
-          src={randomAvatarUrl}
-          alt={name}
-          sx={{ 
-            width: 90, 
-            height: 90, 
-            mb: 1,
-            border: `3px solid ${theme.palette.primary.main}`,
-            '& img': {
-              objectFit: 'cover',
-            }
-          }}
-          onError={() => setRandomAvatarUrl('')}
-        />
-      ) : (
-        defaultAvatar
-      )}
-      <Typography
-        variant="h6"
-        component="h1"
-        sx={{
-          fontWeight: 600,
-          color: theme.palette.text.primary,
-          textAlign: 'center',
-        }}
-      >
-        {displayName}
-      </Typography>
-      <Typography
-        variant="body2"
-        color="textSecondary"
-        sx={{ display: 'flex', alignItems: 'center' }}
-      >
-        <Box component="span" sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'success.main', display: 'inline-block', mr: 1 }} />
-        <Box component="span">Online</Box>
-        <Box component="span" sx={{ mx: 1 }}>|</Box>
-        <Box component="span">Voice: {voiceName}</Box>
-      </Typography>
+     {randomAvatarUrl ? (
+       <Avatar
+         src={randomAvatarUrl}
+         alt={name}
+         sx={{ 
+           width: 90, 
+           height: 90, 
+           mb: 1,
+           border: `3px solid ${theme.palette.primary.main}`,
+           '& img': {
+             objectFit: 'cover',
+           }
+         }}
+         onError={() => setRandomAvatarUrl('')}
+       />
+     ) : (
+       defaultAvatar
+     )}
+     <Typography
+       variant="h6"
+       component="h1"
+       sx={{
+         fontWeight: 600,
+         color: theme.palette.text.primary,
+         textAlign: 'center',
+       }}
+     >
+       {displayName}
+     </Typography>
+     <Typography
+       variant="body2"
+       color="textSecondary"
+       sx={{ display: 'flex', alignItems: 'center' }}
+     >
+       <Box component="span" sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'success.main', display: 'inline-block', mr: 1 }} />
+       <Box component="span">Online</Box>
+       <Box component="span" sx={{ mx: 1 }}>|</Box>
+       <Box component="span">Voice: {voiceName}</Box>
+     </Typography>
     </Box>
   );
 };

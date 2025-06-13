@@ -172,6 +172,30 @@ For more details, see the [Prompts README](server/src/prompts/README.md).
 - **dotenv** - Environment variable management
 - **ts-node** - TypeScript execution for development
 
+## Backend API Structure (2025 Refactor)
+
+The server code in `server/` is now modular and organized for maintainability:
+
+- **src/routes/** — All API endpoints, grouped by feature (e.g., `personas.ts`, `templates.ts`, `chat.ts`, `speech.ts`).
+- **src/services/** — Business logic and utility functions for each feature.
+- **src/types/** — Shared TypeScript types/interfaces for API objects.
+- **src/config/env.ts** — Centralized environment/configuration logic.
+- **src/middleware/errorHandler.ts** — Centralized error handling middleware.
+
+### Example: Adding a New API Feature
+1. Add a new route file in `src/routes/` (e.g., `myfeature.ts`).
+2. Add business logic in `src/services/` if needed.
+3. Add or reuse types in `src/types/`.
+4. Register the new router in `src/index.ts`.
+
+### Refactor Steps Completed
+- All endpoints are now modular and tested.
+- Business logic is separated from routing.
+- Centralized error handling and config.
+- Type safety across the backend.
+
+See `docs/features/plan-api.md` for the full refactor plan and checklist.
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
