@@ -1,4 +1,5 @@
 import { PrompyLoader } from './promptyLoader';
+import { config } from '../config/env';
 
 /**
  * Utility class for managing different Prompty templates based on conversation context
@@ -34,7 +35,7 @@ export class TemplateManager {
    */
   public static extractParameters(messages: any[], templateName: string): Record<string, any> {
     const lastMessage = messages[messages.length - 1]?.content || '';
-    const conversationContext = messages.slice(-3)
+    const conversationContext = messages.slice(-config.messageWindowSize)
       .map(m => `${m.role}: ${m.content}`)
       .join('\n');
     

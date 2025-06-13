@@ -24,3 +24,13 @@ export interface ChatMessage {
 export interface ChatRequest {
   messages: ChatMessage[];
 }
+
+export interface ChatResponse {
+  role: 'assistant';
+  content: string;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+}

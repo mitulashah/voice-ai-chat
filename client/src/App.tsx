@@ -3,38 +3,112 @@ import ChatInterface from './components/ChatInterface';
 import { TemplateProvider } from './context/TemplateContext';
 import { ChatProvider } from './context/ChatContext';
 
-// Create a theme instance
+// Create a Spectrum-inspired theme
 const theme = createTheme({
   palette: {
     primary: {
-      main: '#1976d2',
-      light: '#42a5f5',
-      dark: '#1565c0',
-      contrastText: '#fff',
+      main: '#0066cc', // Spectrum blue
+      light: '#3399ff', 
+      dark: '#004499',
+      contrastText: '#ffffff',
     },
     secondary: {
-      main: '#9c27b0',
-      light: '#ba68c8',
-      dark: '#7b1fa2',
-      contrastText: '#fff',
+      main: '#ff6b35', // Spectrum accent orange
+      light: '#ff9968',
+      dark: '#cc4a1a',
+      contrastText: '#ffffff',
     },
     background: {
-      default: '#f5f5f5',
+      default: '#f8f9fa', // Light gray background
+      paper: '#ffffff',
+    },
+    text: {
+      primary: '#1a1a1a', // Dark text
+      secondary: '#6c757d', // Medium gray
+    },
+    grey: {
+      50: '#f8f9fa',
+      100: '#e9ecef',
+      200: '#dee2e6',
+      300: '#ced4da',
+      400: '#adb5bd',
+      500: '#6c757d',
+      600: '#495057',
+      700: '#343a40',
+      800: '#212529',
+      900: '#000000',
     },
   },
   typography: {
     fontFamily: [
+      '"Segoe UI"',
       '-apple-system',
       'BlinkMacSystemFont',
-      '"Segoe UI"',
       'Roboto',
       '"Helvetica Neue"',
       'Arial',
       'sans-serif',
-      '"Apple Color Emoji"',
-      '"Segoe UI Emoji"',
-      '"Segoe UI Symbol"',
     ].join(','),
+    h1: {
+      fontWeight: 600,
+      fontSize: '2.5rem',
+      lineHeight: 1.2,
+    },
+    h2: {
+      fontWeight: 600,
+      fontSize: '2rem',
+      lineHeight: 1.3,
+    },
+    h3: {
+      fontWeight: 600,
+      fontSize: '1.5rem',
+      lineHeight: 1.4,
+    },
+    body1: {
+      fontSize: '1rem',
+      lineHeight: 1.5,
+    },
+    body2: {
+      fontSize: '0.875rem',
+      lineHeight: 1.5,
+    },
+  },
+  shape: {
+    borderRadius: 8,
+  },
+  components: {    MuiButton: {
+      styleOverrides: {
+        root: {
+          textTransform: 'none',
+          fontWeight: 600,
+          borderRadius: 8,
+          padding: '12px 24px',
+          fontSize: '.9rem',
+        },
+        contained: {
+          boxShadow: '0 2px 8px rgba(0, 102, 204, 0.2)',
+          '&:hover': {
+            boxShadow: '0 4px 12px rgba(0, 102, 204, 0.3)',
+          },
+        },
+      },
+    },
+    MuiCard: {
+      styleOverrides: {
+        root: {
+          boxShadow: '0 2px 16px rgba(0, 0, 0, 0.08)',
+          borderRadius: 12,
+          border: '1px solid #e9ecef',
+        },
+      },
+    },
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          boxShadow: '0 2px 16px rgba(0, 0, 0, 0.08)',
+        },
+      },
+    },
   },
 });
 

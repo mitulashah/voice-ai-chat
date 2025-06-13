@@ -47,7 +47,7 @@ exports.synthesizeSpeech = synthesizeSpeech;
 exports.synthesizeSpeechStream = synthesizeSpeechStream;
 const sdk = __importStar(require("microsoft-cognitiveservices-speech-sdk"));
 const speechService_1 = require("../speechService");
-const speechUtil_js_1 = require("./speechUtil.js");
+const speechUtil_1 = require("./speechUtil");
 const env_1 = require("../config/env");
 function recognizeSpeech(audioData) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -60,7 +60,7 @@ function synthesizeSpeech(text, voiceGender) {
     return __awaiter(this, void 0, void 0, function* () {
         if (!text)
             throw new Error('No text provided');
-        return yield (0, speechUtil_js_1.generateSpeech)(text, voiceGender);
+        return yield (0, speechUtil_1.generateSpeech)(text, voiceGender);
     });
 }
 function synthesizeSpeechStream(text, voiceGender, res) {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Avatar, useTheme } from '@mui/material';
+import { Box, Typography, Avatar } from '@mui/material';
 import { useTemplate } from '../context/TemplateContext';
 
 // Generate a random user ID for avatar
@@ -19,7 +19,6 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   const voiceName = randomAvatarUrl.includes('/men/') ? 'AndrewNeural' : 'JennyNeural';
   const { currentTemplate } = useTemplate();
   const displayName = currentTemplate?.name || name;
-  const theme = useTheme();
   
   useEffect(() => {
     // Use the provided avatarUrl or generate a random one
@@ -32,47 +31,54 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
       const timestamp = new Date().getTime();
       setRandomAvatarUrl(`https://randomuser.me/api/portraits/${gender}/${userId}.jpg?t=${timestamp}`);
     }
-  }, [avatarUrl]);
-  
-  // Fallback to a default avatar if no URL is provided
+  }, [avatarUrl]);  // Fallback to a default avatar with Spectrum styling
   const defaultAvatar = (
     <Avatar
       sx={{
-        width: 90,
-        height: 90,
-        bgcolor: theme.palette.primary.main,
-        color: theme.palette.primary.contrastText,
-        border: `3px solid ${theme.palette.primary.dark}`,
+        width: 81,
+        height: 81,
+        background: 'linear-gradient(135deg, #0066cc 0%, #004499 100%)',
+        color: '#ffffff',
+        border: '3px solid #ffffff',
+        boxShadow: '0 4px 16px rgba(0, 102, 204, 0.3)',
         fontSize: '3rem',
-        mb: 1,
+        fontWeight: 600,        mb: 0.75,
+        transition: 'all 0.3s ease',
+        '&:hover': {
+          transform: 'scale(1.05)',
+          boxShadow: '0 6px 24px rgba(0, 102, 204, 0.4)',
+        }
       }}
     >
       {name.charAt(0).toUpperCase()}
     </Avatar>
-  );
-
-  return (
+  );return (
     <Box
       sx={{
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        py: 1,
-        px: 0.5,
-        gap: 0.5,
+        py: 1.5,
+        px: 1,
+        gap: 0.75,
         position: 'relative',
         zIndex: 10,
+        mb: 1.5,
       }}
-    >
-     {randomAvatarUrl ? (
+    >{randomAvatarUrl ? (
        <Avatar
          src={randomAvatarUrl}
-         alt={name}
-         sx={{ 
-           width: 90, 
-           height: 90, 
-           mb: 1,
-           border: `3px solid ${theme.palette.primary.main}`,
+         alt={name}         sx={{ 
+           width: 81, 
+           height: 81, 
+           mb: 0.75,
+           border: '3px solid #ffffff',
+           boxShadow: '0 4px 16px rgba(0, 102, 204, 0.2)',
+           transition: 'all 0.3s ease',
+           '&:hover': {
+             transform: 'scale(1.05)',
+             boxShadow: '0 6px 24px rgba(0, 102, 204, 0.3)',
+           },
            '& img': {
              objectFit: 'cover',
            }
@@ -81,26 +87,42 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
        />
      ) : (
        defaultAvatar
-     )}
-     <Typography
+     )}     <Typography
        variant="h6"
        component="h1"
        sx={{
-         fontWeight: 600,
-         color: theme.palette.text.primary,
+         fontWeight: 700,
+         background: 'linear-gradient(135deg, #0066cc 0%, #004499 100%)',         WebkitBackgroundClip: 'text',
+         WebkitTextFillColor: 'transparent',
          textAlign: 'center',
+         mb: 0.375,
        }}
      >
        {displayName}
      </Typography>
      <Typography
        variant="body2"
-       color="textSecondary"
-       sx={{ display: 'flex', alignItems: 'center' }}
-     >
-       <Box component="span" sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'success.main', display: 'inline-block', mr: 1 }} />
-       <Box component="span">Online</Box>
-       <Box component="span" sx={{ mx: 1 }}>|</Box>
+       sx={{ 
+         display: 'flex', 
+         alignItems: 'center',
+         color: 'grey.600',
+         fontSize: '0.875rem',
+         fontWeight: 500,
+       }}
+     >       <Box 
+         component="span" 
+         sx={{ 
+           width: 8, 
+           height: 8, 
+           borderRadius: '50%', 
+           background: 'linear-gradient(135deg, #28a745, #20c997)',
+           display: 'inline-block', 
+           mr: 1,
+           boxShadow: '0 0 8px rgba(40, 167, 69, 0.4)',
+         }} 
+       />
+       <Box component="span" sx={{ fontWeight: 600 }}>Online</Box>
+       <Box component="span" sx={{ mx: 1, color: 'grey.400' }}>|</Box>
        <Box component="span">Voice: {voiceName}</Box>
      </Typography>
     </Box>

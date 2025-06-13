@@ -5,11 +5,18 @@ export interface Message {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: number;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
 }
 
 interface ChatContextType {
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
+  totalTokens: number;
+  setTotalTokens: React.Dispatch<React.SetStateAction<number>>;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -19,17 +26,29 @@ interface ChatProviderProps { children: React.ReactNode }
 export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const { currentTemplate } = useTemplate();
   const initRef = useRef(false);
-  const [messages, setMessages] = useState<Message[]>([]);
+  
+  // Load persisted messages and token count or start fresh
+  const [messages, setMessages] = useState<Message[]>(() => {
+    const saved = localStorage.getItem('chatMessages');
+    return saved ? (JSON.parse(saved) as Message[]) : [];
+  });
+  
+  const [totalTokens, setTotalTokens] = useState<number>(() => {
+    const savedTokens = localStorage.getItem('totalTokens');
+    return savedTokens ? parseInt(savedTokens, 10) : 0;
+  });
 
   // Seed initial system prompt once when template is first available
   useEffect(() => {
     if (!currentTemplate || initRef.current) return;
-    setMessages([{ role: 'system', content: currentTemplate.prompt, timestamp: Date.now() }]);
+    if (messages.length === 0) {
+      setMessages([{ role: 'system', content: currentTemplate.prompt, timestamp: Date.now() }]);
+    }
     initRef.current = true;
-  }, [currentTemplate]);
+  }, [currentTemplate, messages.length]);
 
   return (
-    <ChatContext.Provider value={{ messages, setMessages }}>
+    <ChatContext.Provider value={{ messages, setMessages, totalTokens, setTotalTokens }}>
       {children}
     </ChatContext.Provider>
   );

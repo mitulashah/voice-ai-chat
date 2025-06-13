@@ -14,4 +14,6 @@ exports.config = {
     azureOpenAiModel: process.env.AZURE_OPENAI_MODEL || 'gpt-4',
     azureSpeechKey: process.env.AZURE_SPEECH_KEY || 'your-azure-speech-key',
     azureSpeechRegion: process.env.AZURE_SPEECH_REGION || 'eastus',
+    // Message window configuration
+    messageWindowSize: parseInt(process.env.MESSAGE_WINDOW_SIZE || '10', 10),
 };

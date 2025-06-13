@@ -1,5 +1,5 @@
 ---
-name: Spectrum Xumo Box Customer Simulation (Roger)
+name: Spectrum Xumo Customer Simulation
 description: Fixed simulation of a Spectrum customer (Roger) calling about a Xumo box issue. LLM plays the customer.
 authors:
   - Your Name

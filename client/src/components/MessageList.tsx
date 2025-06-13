@@ -80,8 +80,7 @@ const MessageList: React.FC<MessageListProps> = ({
           const isExpanded = expandedSystemIndexes.has(index);
           return (
             <Box key={index} sx={{ mb: 2, width: '100%', display: 'flex', justifyContent: 'flex-start' }}>
-              <SystemPromptBar>
-                <Button
+              <SystemPromptBar>                <Button
                   size="small"
                   onClick={() => {
                     const newSet = new Set(expandedSystemIndexes);
@@ -95,7 +94,7 @@ const MessageList: React.FC<MessageListProps> = ({
                     left: 4,
                     top: isExpanded ? 4 : '50%',
                     transform: isExpanded ? 'none' : 'translateY(-50%)',
-                    fontSize: '1em',
+                    fontSize: '.9rem',
                     p: 0,
                     width: 20,
                     height: 20

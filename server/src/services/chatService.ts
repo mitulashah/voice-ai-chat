@@ -1,5 +1,6 @@
 import { TemplateManager } from '../prompts/templateManager';
 import OpenAI from 'openai';
+// Removed invalid SDK type import; using local types instead
 import { config } from '../config/env';
 
 let openai: OpenAI | null = null;
@@ -14,28 +15,44 @@ if (config.azureOpenAiEndpoint && config.azureOpenAiKey) {
 
 export async function getChatCompletion(messages: any[]) {
   if (!openai) throw new Error('OpenAI client not initialized');
-  try {
+  // Local type for message payload
+  type ChatMessagePayload = { role: 'system' | 'user' | 'assistant'; content: string };
+
+  // Separate client-supplied system prompts and non-system messages
+  const systemMessagesRaw = messages.filter(m => m.role === 'system');
+  const nonSystemMessagesRaw = messages.filter(m => m.role !== 'system');
+  const windowedNonSystemRaw = nonSystemMessagesRaw.slice(-config.messageWindowSize);
+  
+  // Map to SDK message param type
+  // Map to local typed payloads
+  const systemMessages: ChatMessagePayload[] = systemMessagesRaw.map(m => ({ role: m.role, content: m.content }));
+  const windowedNonSystem: ChatMessagePayload[] = windowedNonSystemRaw.map(m => ({ role: m.role, content: m.content }));
+
+  // Build the final messages array for OpenAI, preferring client system prompts
+  // Build final array of messages, using our local type
+  let messagesForOpenAi: ChatMessagePayload[];
+  if (systemMessages.length > 0) {
+    messagesForOpenAi = [...systemMessages, ...windowedNonSystem];
+  } else {
+    // Fallback to server-side template selection if none provided
     const { systemMessage, configuration } = TemplateManager.getContextualPrompt(messages);
-    const messagesWithSystem = [
-      { role: 'system', content: systemMessage },
-      ...messages
-    ];
-    const completion = await openai.chat.completions.create({
-      model: config.azureOpenAiModel,
-      messages: messagesWithSystem,
-      max_tokens: configuration.max_tokens || 800,
-      temperature: configuration.temperature || 0.7,
-      top_p: configuration.top_p || 0.95,
-      frequency_penalty: configuration.frequency_penalty || 0,
-      presence_penalty: configuration.presence_penalty || 0
-    });
-    return completion.choices[0].message;
-  } catch (promptError) {
-    // Fallback to original behavior without template
-    const completion = await openai.chat.completions.create({
-      model: config.azureOpenAiModel,
-      messages: messages,
-    });
-    return completion.choices[0].message;
+    const fallbackSystemMsg: ChatMessagePayload = { role: 'system', content: systemMessage };
+    messagesForOpenAi = [fallbackSystemMsg, ...windowedNonSystem];
   }
-}
+
+  try {
+    // Cast at API boundary to satisfy SDK types
+    const completion = await openai.chat.completions.create({
+      model: config.azureOpenAiModel,
+      messages: messagesForOpenAi as any,
+    });
+    return { ...completion.choices[0].message, usage: completion.usage };
+  } catch (error) {
+    // Retry once on error
+    const retryCompletion = await openai.chat.completions.create({
+      model: config.azureOpenAiModel,
+      messages: messagesForOpenAi as any,
+    });
+    return { ...retryCompletion.choices[0].message, usage: retryCompletion.usage };
+  }
+ }

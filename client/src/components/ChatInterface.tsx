@@ -18,20 +18,23 @@ import MessageList from './MessageList';
 import VoiceInputBar from './VoiceInputBar';
 import ExportDialog from './ExportDialog';
 import { useTemplate } from '../context/TemplateContext';
+import { useChat } from '../context/ChatContext';
 
 interface Message {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: number;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
 }
 
 const ChatInterface: React.FC = () => {
   const { currentTemplate } = useTemplate();
-  // Load persisted messages or start with system prompt
-  const [messages, setMessages] = useState<Message[]>(() => {
-    const saved = localStorage.getItem('chatMessages');
-    return saved ? (JSON.parse(saved) as Message[]) : [];
-  });
+  const { messages, setMessages, totalTokens, setTotalTokens } = useChat();
+  
   const [exportJson, setExportJson] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -40,58 +43,72 @@ const ChatInterface: React.FC = () => {
   const theme = useTheme();
   const { playAudio, isPlaying, currentPlayingId } = useAudioPlayer();
   const { executeWithRetry } = useRetry({ maxAttempts: 3, delayMs: 1000 });
-
   // Keep messagesRef in sync and persist to storage
   useEffect(() => {
     messagesRef.current = messages;
     localStorage.setItem('chatMessages', JSON.stringify(messages));
-  }, [messages]);
-
-  // Seed the system prompt only on initial mount
+    localStorage.setItem('totalTokens', totalTokens.toString());
+  }, [messages, totalTokens]);  // Seed the system prompt only on initial mount
   useEffect(() => {
     if (messages.length === 0 && currentTemplate) {
       setMessages([{ role: 'system', content: currentTemplate.prompt, timestamp: Date.now() }]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  // Update system prompt when the selected scenario/template changes
+  // Reset conversation when the selected scenario/template changes
   useEffect(() => {
     if (!currentTemplate) return;
-    setMessages(prev => {
-      if (prev.length > 0 && prev[0].role === 'system') {
-        // Update existing system prompt content
-        return [{ role: 'system', content: currentTemplate.prompt, timestamp: prev[0].timestamp }, ...prev.slice(1)];
-      }
-      // Prepend system prompt if missing
-      return [{ role: 'system', content: currentTemplate.prompt, timestamp: Date.now() }, ...prev];
-    });
-  }, [currentTemplate?.id]);
-
-  // Track timestamps and end conversation
+    const sysMsg: Message = { role: 'system', content: currentTemplate.prompt, timestamp: Date.now() };
+    // Reset messages to only the new system prompt
+    setMessages([sysMsg]);
+    // Reset token count
+    setTotalTokens(0);
+    // Persist the reset state
+    localStorage.setItem('chatMessages', JSON.stringify([sysMsg]));
+    localStorage.removeItem('totalTokens');
+  }, [currentTemplate?.id]);  // Track timestamps and end conversation
   const handleEndConversation = () => {
     if (messages.length === 0) return;
     const endTime = Date.now();
-    const startTime = messages[0].timestamp;
+    
+    // Find the first user message to start the timer from
+    const firstUserMessage = messages.find(msg => msg.role === 'user');
+    const startTime = firstUserMessage ? firstUserMessage.timestamp : endTime;
     const durationMs = endTime - startTime;
+    
     const exportData = {
-      messages: messages.map(msg => ({ role: msg.role, content: msg.content, timestamp: msg.timestamp })),
-      totalDurationMs: durationMs
+      messages: messages.map(msg => ({ 
+        role: msg.role, 
+        content: msg.content, 
+        timestamp: msg.timestamp,
+        usage: msg.usage 
+      })),
+      totalDurationMs: durationMs,
+      totalTokensUsed: totalTokens,
+      messageCount: messages.filter(m => m.role !== 'system').length
     };
     const jsonString = JSON.stringify(exportData, null, 2);
     setExportJson(jsonString);
-    // Reset to only the initial system prompt
+    // Reset to only the initial system prompt and clear token count
     if (currentTemplate) {
       setMessages([{ role: 'system', content: currentTemplate.prompt, timestamp: Date.now() }]);
+      setTotalTokens(0);
+      localStorage.removeItem('totalTokens');
     } else {
       setMessages([]);
+      setTotalTokens(0);
+      localStorage.removeItem('totalTokens');
     }
-  };
-  // Clear chat but keep only the system prompt
+  };  // Clear chat but keep only the system prompt
   const handleClearChat = () => {
     if (currentTemplate) {
       setMessages([{ role: 'system', content: currentTemplate.prompt, timestamp: Date.now() }]);
+      setTotalTokens(0);
+      localStorage.removeItem('totalTokens');
     } else {
       setMessages([]);
+      setTotalTokens(0);
+      localStorage.removeItem('totalTokens');
     }
   };
 
@@ -99,15 +116,20 @@ const ChatInterface: React.FC = () => {
     if (!transcript.trim()) return;
 
     const userMessage: Message = { role: 'user', content: transcript, timestamp: Date.now() };
-    // Append user message
-    setMessages(prev => [...prev, userMessage]);
+    // Compute updatedMessages to include the new user message and update state
+    let updatedMessages: Message[] = [];
+    setMessages(prev => {
+      updatedMessages = [...prev, userMessage];
+      return updatedMessages;
+    });
     setIsLoading(true);
     setErrorMessage(null);
 
     try {
       const response = await executeWithRetry(
         () => axios.post('http://localhost:5000/api/chat', {
-          messages: [...messages, userMessage].map(({ role, content }) => ({ role, content }))
+          // Send the full messages thread for context
+          messages: updatedMessages.map(({ role, content }) => ({ role, content }))
         }),
         (error, attempt) => {
           console.error(`Attempt ${attempt} failed:`, error);
@@ -122,8 +144,15 @@ const ChatInterface: React.FC = () => {
       const assistantMessage: Message = {
         role: 'assistant',
         content: response.data.content,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        usage: response.data.usage
       };
+      
+      // Update total token count if usage data is available
+      if (response.data.usage) {
+        setTotalTokens(prev => prev + response.data.usage.total_tokens);
+      }
+      
       // Append assistant message
       setMessages(prev => [...prev, assistantMessage]);
       
@@ -186,10 +215,15 @@ const ChatInterface: React.FC = () => {
 
   // Track which system messages are expanded
   const [expandedSystemIndexes, setExpandedSystemIndexes] = useState<Set<number>>(new Set());
-
-  // Render the expandable menu bar and chat header
+  // Render the expandable menu bar and chat header with Spectrum styling
   return (
-    <Container maxWidth="md" sx={{ height: '100vh', display: 'flex', flexDirection: 'column', py: 2 }}>
+    <Container maxWidth="lg" sx={{ 
+      height: '100vh', 
+      display: 'flex', 
+      flexDirection: 'column', 
+      py: 2,
+      background: 'transparent'
+    }}>
       <MenuBar />
       <ChatHeader 
         name="Training Agent"
@@ -199,16 +233,23 @@ const ChatInterface: React.FC = () => {
         sx={{
           display: 'flex',
           flexDirection: 'column',
-          p: 1,
-          borderRadius: 3,
-          boxShadow: 2,
+          p: 3,
+          borderRadius: 4,
+          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
           backgroundColor: theme.palette.background.paper,
+          border: '1px solid',
+          borderColor: 'grey.200',
           flex: 1,
           minHeight: 0,
           overflow: 'hidden',
           width: '100%',
           maxWidth: 'none',
           mx: 0,
+          background: 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
+          transition: 'all 0.3s ease',
+          '&:hover': {
+            boxShadow: '0 12px 48px rgba(0, 0, 0, 0.16)',
+          }
         }}
       >
         {/* Messages container */}
@@ -228,22 +269,27 @@ const ChatInterface: React.FC = () => {
           isListening={isListening}
           toggleListening={toggleListening}
         />
-      </Paper>
-      {/* Button bar for conversation controls (outside chat panel) */}
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2, mb: 1 }}>
-        <Button
+      </Paper>      {/* Button bar for conversation controls with Spectrum styling */}
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3, mb: 1, gap: 2 }}>        <Button
           variant="outlined"
           color="inherit"
           onClick={handleClearChat}
           sx={{
             textTransform: 'none',
-            mr: 1,
+            fontWeight: 600,
+            fontSize: '.9rem',
+            borderRadius: 2,
+            px: 3,
+            py: 1.5,
             color: 'grey.700',
-            borderColor: 'grey.400',
+            borderColor: 'grey.300',
+            transition: 'all 0.3s ease',
             '&:hover': {
-              borderColor: 'grey.600',
-              backgroundColor: 'grey.100',
-              color: 'grey.900',
+              borderColor: theme.palette.primary.main,
+              backgroundColor: 'rgba(0, 102, 204, 0.04)',
+              color: theme.palette.primary.main,
+              transform: 'translateY(-2px)',
+              boxShadow: '0 4px 12px rgba(0, 102, 204, 0.15)',
             },
           }}
         >
@@ -254,19 +300,28 @@ const ChatInterface: React.FC = () => {
           onClick={handleEndConversation}
           sx={{
             textTransform: 'none',
-            backgroundColor: '#FF7F50', // coral/peach
-            '&:hover': { backgroundColor: '#E06C47' }
+            fontWeight: 600,
+            fontSize: '.9rem',
+            borderRadius: 2,
+            px: 3,
+            py: 1.5,
+            background: 'linear-gradient(135deg, #ff6b35 0%, #cc4a1a 100%)',
+            transition: 'all 0.3s ease',
+            '&:hover': { 
+              background: 'linear-gradient(135deg, #cc4a1a 0%, #994d1f 100%)',
+              transform: 'translateY(-2px)',
+              boxShadow: '0 4px 12px rgba(255, 107, 53, 0.3)',
+            }
           }}
         >
           Evaluate Conversation
         </Button>
-      </Box>
-
-     <Snackbar
+      </Box>     <Snackbar
        open={Boolean(errorMessage)}
        autoHideDuration={6000}
        onClose={() => setErrorMessage(null)}
        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+       disableWindowBlurListener={true}
      >
        <Alert
          onClose={() => setErrorMessage(null)}
