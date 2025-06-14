@@ -27,10 +27,95 @@ router.get('/', (_req, res) => __awaiter(void 0, void 0, void 0, function* () {
         res.status(500).json({ success: false, error: 'Failed to load personas', details: error instanceof Error ? error.message : 'Unknown error' });
     }
 }));
-// GET /api/personas/:id - Get a single persona by id
+// GET /api/personas/search - Search personas by query parameter (?q=term)
+router.get('/search', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const searchTerm = req.query.q;
+        if (!searchTerm) {
+            res.status(400).json({
+                success: false,
+                error: 'Search term is required. Use /search?q=term.'
+            });
+            return;
+        }
+        const personas = (0, personaService_1.searchPersonas)(searchTerm);
+        res.json({
+            success: true,
+            personas,
+            count: personas.length,
+            searchTerm,
+            searchMethod: 'query'
+        });
+    }
+    catch (error) {
+        res.status(500).json({
+            success: false,
+            error: 'Failed to search personas',
+            details: error instanceof Error ? error.message : 'Unknown error'
+        });
+    }
+}));
+// GET /api/personas/search/:term - Search personas by path parameter
+router.get('/search/:term', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const searchTerm = req.params.term;
+        if (!searchTerm) {
+            res.status(400).json({
+                success: false,
+                error: 'Search term is required. Use /search/:term.'
+            });
+            return;
+        }
+        const personas = (0, personaService_1.searchPersonas)(searchTerm);
+        res.json({
+            success: true,
+            personas,
+            count: personas.length,
+            searchTerm,
+            searchMethod: 'path'
+        });
+    }
+    catch (error) {
+        res.status(500).json({
+            success: false,
+            error: 'Failed to search personas',
+            details: error instanceof Error ? error.message : 'Unknown error'
+        });
+    }
+}));
+// GET /api/personas/age-group/:ageGroup - Filter personas by age group (new database feature)
+router.get('/age-group/:ageGroup', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const ageGroup = req.params.ageGroup;
+        const personas = (0, personaService_1.getPersonasByAgeGroup)(ageGroup);
+        res.json({
+            success: true,
+            personas,
+            count: personas.length,
+            ageGroup
+        });
+    }
+    catch (error) {
+        res.status(500).json({
+            success: false,
+            error: 'Failed to filter personas by age group',
+            details: error instanceof Error ? error.message : 'Unknown error'
+        });
+    }
+}));
+// GET /api/personas/:id - Get a single persona by id (must come after specific routes)
 router.get('/:id', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const persona = (0, personaService_1.getPersonaById)(req.params.id);
+        // Skip if this looks like a search or other special route that wasn't caught above
+        const id = req.params.id;
+        if (id === 'search' || id === 'age-group') {
+            res.status(400).json({
+                success: false,
+                error: `Invalid persona ID: ${id}. Use /search?q=term for searching or /age-group/:group for filtering.`
+            });
+            return;
+        }
+        const persona = (0, personaService_1.getPersonaById)(id);
         if (!persona) {
             res.status(404).json({ success: false, error: 'Persona not found' });
             return;

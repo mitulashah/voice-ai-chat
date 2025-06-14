@@ -32,6 +32,15 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -42,6 +51,7 @@ const env_1 = require("./config/env");
 const openai_1 = __importDefault(require("openai"));
 const sdk = __importStar(require("microsoft-cognitiveservices-speech-sdk"));
 const errorHandler_1 = require("./middleware/errorHandler");
+const database_service_factory_1 = require("./services/database-service-factory");
 const personas_1 = __importDefault(require("./routes/personas"));
 const templates_1 = __importDefault(require("./routes/templates"));
 const chat_1 = __importDefault(require("./routes/chat"));
@@ -88,9 +98,67 @@ app.use('/api/speech/token', token_1.default);
 app.use('/api/stats', stats_1.default);
 // Error handling middleware
 app.use(errorHandler_1.errorHandler);
-// Start server
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-    console.log(`OpenAI client initialized: ${!!openai}`);
-    console.log(`Azure Speech config initialized: ${!!speechConfig}`);
-});
+// Initialize database service and start server
+function startServer() {
+    return __awaiter(this, void 0, void 0, function* () {
+        try {
+            console.log('🚀 Starting Voice AI Chat Server...');
+            // Configure database service based on environment
+            database_service_factory_1.databaseServiceFactory.configure({
+                useDatabaseByDefault: true, // Always use database for better performance
+                fallbackToFiles: true, // Fallback to files if database fails
+                dbPath: process.env.DATABASE_PATH // Allow custom database path
+            });
+            // Initialize database service
+            console.log('🔧 Initializing database service...');
+            yield database_service_factory_1.databaseServiceFactory.initializeDatabase();
+            if (database_service_factory_1.databaseServiceFactory.isDatabaseReady()) {
+                console.log('✅ Database service ready - using database storage');
+            }
+            else {
+                console.log('⚠️  Database service failed - using file-based fallback');
+                const error = database_service_factory_1.databaseServiceFactory.getInitializationError();
+                if (error) {
+                    console.log(`   Error: ${error.message}`);
+                }
+            }
+            // Start the Express server
+            app.listen(PORT, () => {
+                console.log(`\n🎉 Server is running on port ${PORT}`);
+                console.log(`OpenAI client initialized: ${!!openai}`);
+                console.log(`Azure Speech config initialized: ${!!speechConfig}`);
+                console.log(`Database service status: ${database_service_factory_1.databaseServiceFactory.isDatabaseReady() ? 'Ready' : 'Fallback mode'}`);
+                console.log(`\n📊 Server ready for requests!`);
+            });
+        }
+        catch (error) {
+            console.error('💥 Failed to start server:', error);
+            process.exit(1);
+        }
+    });
+}
+// Graceful shutdown handling
+process.on('SIGINT', () => __awaiter(void 0, void 0, void 0, function* () {
+    console.log('\n🛑 Graceful shutdown initiated...');
+    try {
+        yield database_service_factory_1.databaseServiceFactory.close();
+        console.log('✅ Database service closed');
+    }
+    catch (error) {
+        console.error('❌ Error closing database service:', error);
+    }
+    console.log('👋 Server shut down successfully');
+    process.exit(0);
+}));
+process.on('SIGTERM', () => __awaiter(void 0, void 0, void 0, function* () {
+    console.log('\n🛑 SIGTERM received, shutting down...');
+    try {
+        yield database_service_factory_1.databaseServiceFactory.close();
+    }
+    catch (error) {
+        console.error('❌ Error during shutdown:', error);
+    }
+    process.exit(0);
+}));
+// Start the server
+startServer();

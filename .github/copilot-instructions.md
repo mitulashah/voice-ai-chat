@@ -10,6 +10,8 @@ This document provides coding standards and best practices for our TypeScript, R
 - Write self-documenting code with meaningful comments for complex business logic
 - Follow the DRY (Don't Repeat Yourself) principle
 - Use early returns to reduce nesting and improve readability
+- DON'T ask permission to write code, just write it
+- Have a strong recommendation and perform that task.  Only list alternatives if there are significant trade-offs.
 - When generating terminal commands, use Windows Powershell syntax and always include full paths for clarity
 
 ## TypeScript Best Practices

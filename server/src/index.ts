@@ -4,6 +4,7 @@ import { config } from './config/env';
 import OpenAI from 'openai';
 import * as sdk from 'microsoft-cognitiveservices-speech-sdk';
 import { errorHandler } from './middleware/errorHandler';
+import { databaseServiceFactory } from './services/database-service-factory';
 import personasRouter from './routes/personas';
 import templatesRouter from './routes/templates';
 import chatRouter from './routes/chat';
@@ -67,9 +68,73 @@ app.use('/api/stats', statsRouter);
 // Error handling middleware
 app.use(errorHandler);
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-  console.log(`OpenAI client initialized: ${!!openai}`);
-  console.log(`Azure Speech config initialized: ${!!speechConfig}`);
+// Initialize database service and start server
+async function startServer() {
+  try {
+    console.log('🚀 Starting Voice AI Chat Server...');
+    
+    // Configure database service based on environment
+    databaseServiceFactory.configure({
+      useDatabaseByDefault: true, // Always use database for better performance
+      fallbackToFiles: true, // Fallback to files if database fails
+      dbPath: process.env.DATABASE_PATH // Allow custom database path
+    });
+    
+    // Initialize database service
+    console.log('🔧 Initializing database service...');
+    await databaseServiceFactory.initializeDatabase();
+    
+    if (databaseServiceFactory.isDatabaseReady()) {
+      console.log('✅ Database service ready - using database storage');
+    } else {
+      console.log('⚠️  Database service failed - using file-based fallback');
+      const error = databaseServiceFactory.getInitializationError();
+      if (error) {
+        console.log(`   Error: ${error.message}`);
+      }
+    }
+    
+    // Start the Express server
+    app.listen(PORT, () => {
+      console.log(`\n🎉 Server is running on port ${PORT}`);
+      console.log(`OpenAI client initialized: ${!!openai}`);
+      console.log(`Azure Speech config initialized: ${!!speechConfig}`);
+      console.log(`Database service status: ${databaseServiceFactory.isDatabaseReady() ? 'Ready' : 'Fallback mode'}`);
+      console.log(`\n📊 Server ready for requests!`);
+    });
+    
+  } catch (error) {
+    console.error('💥 Failed to start server:', error);
+    process.exit(1);
+  }
+}
+
+// Graceful shutdown handling
+process.on('SIGINT', async () => {
+  console.log('\n🛑 Graceful shutdown initiated...');
+  
+  try {
+    await databaseServiceFactory.close();
+    console.log('✅ Database service closed');
+  } catch (error) {
+    console.error('❌ Error closing database service:', error);
+  }
+  
+  console.log('👋 Server shut down successfully');
+  process.exit(0);
 });
+
+process.on('SIGTERM', async () => {
+  console.log('\n🛑 SIGTERM received, shutting down...');
+  
+  try {
+    await databaseServiceFactory.close();
+  } catch (error) {
+    console.error('❌ Error during shutdown:', error);
+  }
+  
+  process.exit(0);
+});
+
+// Start the server
+startServer();
