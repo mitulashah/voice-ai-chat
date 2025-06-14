@@ -46,6 +46,8 @@ const personas_1 = __importDefault(require("./routes/personas"));
 const templates_1 = __importDefault(require("./routes/templates"));
 const chat_1 = __importDefault(require("./routes/chat"));
 const speech_1 = __importDefault(require("./routes/speech"));
+const stats_1 = __importDefault(require("./routes/stats"));
+const token_1 = __importDefault(require("./routes/token"));
 const app = (0, express_1.default)();
 const PORT = env_1.config.port;
 // Middleware
@@ -82,6 +84,8 @@ app.get('/api/health', (req, res) => {
 app.use('/api/templates', templates_1.default);
 app.use('/api/chat', chat_1.default);
 app.use('/api/speech', speech_1.default);
+app.use('/api/speech/token', token_1.default);
+app.use('/api/stats', stats_1.default);
 // Error handling middleware
 app.use(errorHandler_1.errorHandler);
 // Start server

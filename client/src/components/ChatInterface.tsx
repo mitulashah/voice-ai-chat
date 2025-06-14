@@ -269,8 +269,10 @@ const ChatInterface: React.FC = () => {
           isListening={isListening}
           toggleListening={toggleListening}
         />
-      </Paper>      {/* Button bar for conversation controls with Spectrum styling */}
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3, mb: 1, gap: 2 }}>        <Button
+      </Paper>
+      {/* Button bar for conversation controls with Spectrum styling */}
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3, mb: 1, gap: 2 }}>
+        <Button
           variant="outlined"
           color="inherit"
           onClick={handleClearChat}

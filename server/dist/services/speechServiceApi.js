@@ -41,6 +41,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.recognizeSpeech = recognizeSpeech;
 exports.synthesizeSpeech = synthesizeSpeech;
@@ -49,6 +52,7 @@ const sdk = __importStar(require("microsoft-cognitiveservices-speech-sdk"));
 const speechService_1 = require("../speechService");
 const speechUtil_1 = require("./speechUtil");
 const env_1 = require("../config/env");
+const statsService_1 = __importDefault(require("./statsService"));
 function recognizeSpeech(audioData) {
     return __awaiter(this, void 0, void 0, function* () {
         if (!audioData)
@@ -60,6 +64,8 @@ function synthesizeSpeech(text, voiceGender) {
     return __awaiter(this, void 0, void 0, function* () {
         if (!text)
             throw new Error('No text provided');
+        // Record synthesized audio character count
+        statsService_1.default.recordAudioChars(text.length);
         return yield (0, speechUtil_1.generateSpeech)(text, voiceGender);
     });
 }
@@ -67,6 +73,8 @@ function synthesizeSpeechStream(text, voiceGender, res) {
     return __awaiter(this, void 0, void 0, function* () {
         if (!text)
             throw new Error('No text provided');
+        // Record synthesized audio character count
+        statsService_1.default.recordAudioChars(text.length);
         const voiceName = voiceGender === 'male' ? 'en-US-AndrewNeural' : 'en-US-JennyNeural';
         const speechConfig = sdk.SpeechConfig.fromSubscription(env_1.config.azureSpeechKey, env_1.config.azureSpeechRegion);
         speechConfig.speechSynthesisVoiceName = voiceName;

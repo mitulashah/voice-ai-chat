@@ -2,6 +2,7 @@ import { TemplateManager } from '../prompts/templateManager';
 import OpenAI from 'openai';
 // Removed invalid SDK type import; using local types instead
 import { config } from '../config/env';
+import statsService from './statsService';
 
 let openai: OpenAI | null = null;
 if (config.azureOpenAiEndpoint && config.azureOpenAiKey) {
@@ -46,6 +47,10 @@ export async function getChatCompletion(messages: any[]) {
       model: config.azureOpenAiModel,
       messages: messagesForOpenAi as any,
     });
+    // Record token usage
+    if (completion.usage?.total_tokens) {
+      statsService.recordTokens(completion.usage.total_tokens);
+    }
     return { ...completion.choices[0].message, usage: completion.usage };
   } catch (error) {
     // Retry once on error
@@ -53,6 +58,10 @@ export async function getChatCompletion(messages: any[]) {
       model: config.azureOpenAiModel,
       messages: messagesForOpenAi as any,
     });
+    // Record token usage on retry
+    if (retryCompletion.usage?.total_tokens) {
+      statsService.recordTokens(retryCompletion.usage.total_tokens);
+    }
     return { ...retryCompletion.choices[0].message, usage: retryCompletion.usage };
   }
  }

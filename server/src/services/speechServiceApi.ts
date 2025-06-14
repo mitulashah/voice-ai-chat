@@ -2,6 +2,7 @@ import * as sdk from 'microsoft-cognitiveservices-speech-sdk';
 import { processAudioForSpeechRecognition } from '../speechService';
 import { generateSpeech } from './speechUtil';
 import { config } from '../config/env';
+import statsService from './statsService';
 
 export async function recognizeSpeech(audioData: string) {
   if (!audioData) throw new Error('No audio data provided');
@@ -10,11 +11,15 @@ export async function recognizeSpeech(audioData: string) {
 
 export async function synthesizeSpeech(text: string, voiceGender?: 'male' | 'female') {
   if (!text) throw new Error('No text provided');
+  // Record synthesized audio character count
+  statsService.recordAudioChars(text.length);
   return await generateSpeech(text, voiceGender);
 }
 
 export async function synthesizeSpeechStream(text: string, voiceGender: 'male' | 'female' | undefined, res: any) {
   if (!text) throw new Error('No text provided');
+  // Record synthesized audio character count
+  statsService.recordAudioChars(text.length);
   const voiceName = voiceGender === 'male' ? 'en-US-AndrewNeural' : 'en-US-JennyNeural';
   const speechConfig = sdk.SpeechConfig.fromSubscription(
     config.azureSpeechKey,

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Avatar, Button, Collapse, CircularProgress, IconButton, useTheme, styled } from '@mui/material';
+import { Box, Avatar, Button, CircularProgress, IconButton, useTheme, styled } from '@mui/material';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { VolumeUp as VolumeUpIcon } from '@mui/icons-material';

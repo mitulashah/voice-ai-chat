@@ -15,7 +15,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.getChatCompletion = getChatCompletion;
 const templateManager_1 = require("../prompts/templateManager");
 const openai_1 = __importDefault(require("openai"));
+// Removed invalid SDK type import; using local types instead
 const env_1 = require("../config/env");
+const statsService_1 = __importDefault(require("./statsService"));
 let openai = null;
 if (env_1.config.azureOpenAiEndpoint && env_1.config.azureOpenAiKey) {
     openai = new openai_1.default({
@@ -27,70 +29,52 @@ if (env_1.config.azureOpenAiEndpoint && env_1.config.azureOpenAiKey) {
 }
 function getChatCompletion(messages) {
     return __awaiter(this, void 0, void 0, function* () {
+        var _a, _b;
         if (!openai)
             throw new Error('OpenAI client not initialized');
-        console.log('Chat service received messages:', messages.length, 'messages');
-        console.log('System messages:', messages.filter(m => m.role === 'system').length);
-        console.log('User messages:', messages.filter(m => m.role === 'user').length);
-        console.log('Assistant messages:', messages.filter(m => m.role === 'assistant').length);
-        // Preserve conversation context by not applying aggressive windowing
-        // Only apply windowing if we have too many messages (e.g., >50) to prevent token limits
-        const shouldApplyWindowing = messages.length > 50;
-        let processedMessages = messages;
-        if (shouldApplyWindowing) {
-            console.log('Applying message windowing due to', messages.length, 'messages');
-            // Keep system messages and recent conversation history
-            const systemMessages = messages.filter(m => m.role === 'system');
-            const nonSystemMessages = messages.filter(m => m.role !== 'system');
-            const windowedNonSystemMessages = nonSystemMessages.slice(-env_1.config.messageWindowSize);
-            processedMessages = [...systemMessages, ...windowedNonSystemMessages];
+        // Separate client-supplied system prompts and non-system messages
+        const systemMessagesRaw = messages.filter(m => m.role === 'system');
+        const nonSystemMessagesRaw = messages.filter(m => m.role !== 'system');
+        const windowedNonSystemRaw = nonSystemMessagesRaw.slice(-env_1.config.messageWindowSize);
+        // Map to SDK message param type
+        // Map to local typed payloads
+        const systemMessages = systemMessagesRaw.map(m => ({ role: m.role, content: m.content }));
+        const windowedNonSystem = windowedNonSystemRaw.map(m => ({ role: m.role, content: m.content }));
+        // Build the final messages array for OpenAI, preferring client system prompts
+        // Build final array of messages, using our local type
+        let messagesForOpenAi;
+        if (systemMessages.length > 0) {
+            messagesForOpenAi = [...systemMessages, ...windowedNonSystem];
+        }
+        else {
+            // Fallback to server-side template selection if none provided
+            const { systemMessage, configuration } = templateManager_1.TemplateManager.getContextualPrompt(messages);
+            const fallbackSystemMsg = { role: 'system', content: systemMessage };
+            messagesForOpenAi = [fallbackSystemMsg, ...windowedNonSystem];
         }
         try {
-            // Check if we already have a system message from the frontend
-            const hasSystemMessage = processedMessages.some(m => m.role === 'system');
-            console.log('Has system message from frontend:', hasSystemMessage);
-            if (hasSystemMessage) {
-                console.log('Using messages from frontend with system prompt');
-                // Use the messages as-is since frontend already has system prompt
-                const completion = yield openai.chat.completions.create({
-                    model: env_1.config.azureOpenAiModel,
-                    messages: processedMessages,
-                    max_tokens: 800,
-                    temperature: 0.7,
-                    top_p: 0.95,
-                    frequency_penalty: 0,
-                    presence_penalty: 0
-                });
-                return Object.assign(Object.assign({}, completion.choices[0].message), { usage: completion.usage });
-            }
-            else {
-                console.log('No system message from frontend, using template manager');
-                // Fallback: use template manager if no system message from frontend
-                const { systemMessage, configuration } = templateManager_1.TemplateManager.getContextualPrompt(processedMessages);
-                const messagesWithSystem = [
-                    { role: 'system', content: systemMessage },
-                    ...processedMessages.filter(m => m.role !== 'system')
-                ];
-                const completion = yield openai.chat.completions.create({
-                    model: env_1.config.azureOpenAiModel,
-                    messages: messagesWithSystem,
-                    max_tokens: configuration.max_tokens || 800,
-                    temperature: configuration.temperature || 0.7,
-                    top_p: configuration.top_p || 0.95,
-                    frequency_penalty: configuration.frequency_penalty || 0,
-                    presence_penalty: configuration.presence_penalty || 0
-                });
-                return Object.assign(Object.assign({}, completion.choices[0].message), { usage: completion.usage });
-            }
-        }
-        catch (error) {
-            console.error('Error in chat completion:', error);
-            // Fallback to simple completion with original messages
+            // Cast at API boundary to satisfy SDK types
             const completion = yield openai.chat.completions.create({
                 model: env_1.config.azureOpenAiModel,
-                messages: processedMessages,
+                messages: messagesForOpenAi,
             });
+            // Record token usage
+            if ((_a = completion.usage) === null || _a === void 0 ? void 0 : _a.total_tokens) {
+                statsService_1.default.recordTokens(completion.usage.total_tokens);
+            }
             return Object.assign(Object.assign({}, completion.choices[0].message), { usage: completion.usage });
+        }
+        catch (error) {
+            // Retry once on error
+            const retryCompletion = yield openai.chat.completions.create({
+                model: env_1.config.azureOpenAiModel,
+                messages: messagesForOpenAi,
+            });
+            // Record token usage on retry
+            if ((_b = retryCompletion.usage) === null || _b === void 0 ? void 0 : _b.total_tokens) {
+                statsService_1.default.recordTokens(retryCompletion.usage.total_tokens);
+            }
+            return Object.assign(Object.assign({}, retryCompletion.choices[0].message), { usage: retryCompletion.usage });
         }
     });
 }

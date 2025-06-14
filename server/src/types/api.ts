@@ -34,3 +34,9 @@ export interface ChatResponse {
     total_tokens: number;
   };
 }
+
+export interface Stats {
+  llmTokenCount: number;
+  speechDurationSeconds: number;
+  audioCharacterCount: number;
+}

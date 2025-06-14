@@ -1,6 +1,7 @@
 import * as sdk from 'microsoft-cognitiveservices-speech-sdk';
 import * as fsExtra from 'fs-extra';
 import * as path from 'path';
+import statsService from './services/statsService';
 
 // Function to perform speech recognition
 async function performSpeechRecognition(wavFilePath: string): Promise<sdk.SpeechRecognitionResult> {
@@ -55,6 +56,7 @@ export async function processAudioForSpeechRecognition(audioData: string): Promi
   try {
     // Decode and save WAV directly from client
     const audioBuffer = Buffer.from(audioData, 'base64');
+    // Save raw audio for recognition
     if (audioBuffer.length === 0) {
       throw new Error('Empty audio data provided');
     }
@@ -70,6 +72,9 @@ export async function processAudioForSpeechRecognition(audioData: string): Promi
       if (!text) {
         throw new Error('No speech was detected in the audio');
       }
+      // Record actual speech duration from recognition result (ticks -> seconds)
+      const durationSec = (result.duration ?? 0) / 10000000;
+      statsService.recordSpeechDuration(durationSec);
       return text;
     } else if (result.reason === sdk.ResultReason.NoMatch) {
       const noMatchDetail = sdk.NoMatchDetails.fromResult(result);

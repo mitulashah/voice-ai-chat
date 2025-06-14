@@ -8,6 +8,8 @@ import personasRouter from './routes/personas';
 import templatesRouter from './routes/templates';
 import chatRouter from './routes/chat';
 import speechRouter from './routes/speech';
+import statsRouter from './routes/stats';
+import tokenRouter from './routes/token';
 
 const app: Express = express();
 const PORT = config.port;
@@ -59,6 +61,8 @@ app.get('/api/health', (req: Request, res: Response) => {
 app.use('/api/templates', templatesRouter);
 app.use('/api/chat', chatRouter);
 app.use('/api/speech', speechRouter);
+app.use('/api/speech/token', tokenRouter);
+app.use('/api/stats', statsRouter);
 
 // Error handling middleware
 app.use(errorHandler);

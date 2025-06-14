@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.TemplateManager = void 0;
 const promptyLoader_1 = require("./promptyLoader");
+const env_1 = require("../config/env");
 /**
  * Utility class for managing different Prompty templates based on conversation context
  */
@@ -33,7 +34,7 @@ class TemplateManager {
     static extractParameters(messages, templateName) {
         var _a;
         const lastMessage = ((_a = messages[messages.length - 1]) === null || _a === void 0 ? void 0 : _a.content) || '';
-        const conversationContext = messages.slice(-3)
+        const conversationContext = messages.slice(-env_1.config.messageWindowSize)
             .map(m => `${m.role}: ${m.content}`)
             .join('\n');
         const baseParams = {

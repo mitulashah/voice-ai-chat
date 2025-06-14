@@ -41,11 +41,15 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.processAudioForSpeechRecognition = processAudioForSpeechRecognition;
 const sdk = __importStar(require("microsoft-cognitiveservices-speech-sdk"));
 const fsExtra = __importStar(require("fs-extra"));
 const path = __importStar(require("path"));
+const statsService_1 = __importDefault(require("./services/statsService"));
 // Function to perform speech recognition
 function performSpeechRecognition(wavFilePath) {
     return __awaiter(this, void 0, void 0, function* () {
@@ -79,6 +83,7 @@ function performSpeechRecognition(wavFilePath) {
 }
 function processAudioForSpeechRecognition(audioData) {
     return __awaiter(this, void 0, void 0, function* () {
+        var _a;
         if (!audioData) {
             throw new Error('No audio data provided');
         }
@@ -89,6 +94,7 @@ function processAudioForSpeechRecognition(audioData) {
         try {
             // Decode and save WAV directly from client
             const audioBuffer = Buffer.from(audioData, 'base64');
+            // Save raw audio for recognition
             if (audioBuffer.length === 0) {
                 throw new Error('Empty audio data provided');
             }
@@ -104,6 +110,9 @@ function processAudioForSpeechRecognition(audioData) {
                 if (!text) {
                     throw new Error('No speech was detected in the audio');
                 }
+                // Record actual speech duration from recognition result (ticks -> seconds)
+                const durationSec = ((_a = result.duration) !== null && _a !== void 0 ? _a : 0) / 10000000;
+                statsService_1.default.recordSpeechDuration(durationSec);
                 return text;
             }
             else if (result.reason === sdk.ResultReason.NoMatch) {

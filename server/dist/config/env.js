@@ -15,5 +15,6 @@ exports.config = {
     azureSpeechKey: process.env.AZURE_SPEECH_KEY || 'your-azure-speech-key',
     azureSpeechRegion: process.env.AZURE_SPEECH_REGION || 'eastus',
     // Message window configuration
-    messageWindowSize: parseInt(process.env.MESSAGE_WINDOW_SIZE || '10', 10),
+    // Ensure messageWindowSize is at least 20, parsing in base 10
+    messageWindowSize: Math.max(parseInt(process.env.MESSAGE_WINDOW_SIZE || '20', 10), 20),
 };

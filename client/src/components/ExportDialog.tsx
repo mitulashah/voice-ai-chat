@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Typography, Box, Button, Paper } from '@mui/material';
 
 interface ExportDialogProps {
@@ -8,6 +8,8 @@ interface ExportDialogProps {
 }
 
 const ExportDialog: React.FC<ExportDialogProps> = ({ exportJson, onClose, onDownload }) => {
+  const [stats, setStats] = useState<{ speechDurationSeconds: number; audioCharacterCount: number } | null>(null);
+  
   // Parse the export data to extract token information
   const exportData = exportJson ? JSON.parse(exportJson) : null;
   const totalTokens = exportData?.totalTokensUsed || 0;
@@ -21,6 +23,21 @@ const ExportDialog: React.FC<ExportDialogProps> = ({ exportJson, onClose, onDown
   const displayDuration = hasUserMessages 
     ? `${durationMinutes}:${durationSeconds.toString().padStart(2, '0')}`
     : '0:00';
+
+  useEffect(() => {
+    if (!exportJson) return;
+    const fetchStats = async () => {
+      try {
+        const res = await fetch('http://localhost:5000/api/stats');
+        const data = await res.json();
+        setStats({ speechDurationSeconds: data.speechDurationSeconds, audioCharacterCount: data.audioCharacterCount });
+      } catch (e) {
+        console.error('Failed to fetch stats:', e);
+      }
+    };
+    fetchStats();
+  }, [exportJson]);
+
   return (
     <Dialog
       open={Boolean(exportJson)}
@@ -37,7 +54,8 @@ const ExportDialog: React.FC<ExportDialogProps> = ({ exportJson, onClose, onDown
           <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, fontSize: '0.875rem' }}>
             Statistics
           </Typography>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>  
+            {/* First row: Tokens, Messages, Duration */}
             <Box textAlign="center" sx={{ flex: 1 }}>
               <Typography variant="h6" color="primary" fontWeight="bold" sx={{ fontSize: '1.1rem' }}>
                 {totalTokens.toLocaleString()}
@@ -62,6 +80,9 @@ const ExportDialog: React.FC<ExportDialogProps> = ({ exportJson, onClose, onDown
                 Duration
               </Typography>
             </Box>
+          </Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
+            {/* Second row: Avg/Msg, Speech Secs (export duration), Audio Chars */}
             <Box textAlign="center" sx={{ flex: 1 }}>
               <Typography variant="h6" color="warning.main" fontWeight="bold" sx={{ fontSize: '1.1rem' }}>
                 {messageCount > 0 ? Math.round(totalTokens / messageCount) : 0}
@@ -70,6 +91,26 @@ const ExportDialog: React.FC<ExportDialogProps> = ({ exportJson, onClose, onDown
                 Avg/Msg
               </Typography>
             </Box>
+            {stats && (
+              <>
+                <Box textAlign="center" sx={{ flex: 1 }}>
+                  <Typography variant="h6" color="info.main" fontWeight="bold" sx={{ fontSize: '1.1rem' }}>
+                    {stats.speechDurationSeconds.toFixed(2)} s
+                  </Typography>
+                  <Typography variant="caption" color="textSecondary" sx={{ fontSize: '0.7rem' }}>
+                    Speech Secs
+                  </Typography>
+                </Box>
+                <Box textAlign="center" sx={{ flex: 1 }}>
+                  <Typography variant="h6" color="info.dark" fontWeight="bold" sx={{ fontSize: '1.1rem' }}>
+                    {stats.audioCharacterCount.toLocaleString()}
+                  </Typography>
+                  <Typography variant="caption" color="textSecondary" sx={{ fontSize: '0.7rem' }}>
+                    Audio Chars
+                  </Typography>
+                </Box>
+              </>
+            )}
           </Box>
         </Paper>
 

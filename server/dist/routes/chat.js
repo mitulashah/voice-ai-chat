@@ -17,10 +17,6 @@ router.post('/', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
         const { messages } = req.body;
-        console.log('Received messages:', messages.map((m) => ({
-            role: m.role,
-            content: m.content.substring(0, 100) + (m.content.length > 100 ? '...' : '')
-        })));
         const result = yield (0, chatService_1.getChatCompletion)(messages);
         // Ensure content is always a string and include usage data
         res.json({
@@ -30,7 +26,6 @@ router.post('/', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         });
     }
     catch (error) {
-        console.error('Chat endpoint error:', error);
         res.json({
             role: 'assistant',
             content: 'Sorry, I encountered an error processing your request. Please try again.'

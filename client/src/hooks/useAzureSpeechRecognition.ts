@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import * as SpeechSDK from 'microsoft-cognitiveservices-speech-sdk';
+import { fetchSpeechToken } from '../utils/speechApi';
 
 interface SpeechRecognitionState {
   isListening: boolean;
@@ -11,12 +12,13 @@ interface SpeechRecognitionState {
 export const useAzureSpeechRecognition = (onTranscript: (text: string) => void): SpeechRecognitionState => {
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [speechToken, setSpeechToken] = useState<string | null>(null);
+  const [speechRegion, setSpeechRegion] = useState<string | null>(null);
   const recognizerRef = useRef<SpeechSDK.SpeechRecognizer | null>(null);
   const stopTimeoutRef = useRef<number | null>(null);
-
-  // Replace with your actual Azure Speech credentials or load from env/config
-  const AZURE_SPEECH_KEY = import.meta.env.VITE_AZURE_SPEECH_KEY || '';
-  const AZURE_SPEECH_REGION = import.meta.env.VITE_AZURE_SPEECH_REGION || '';
+  // Track start and end time for speech duration
+  const sessionStartTime = useRef<number | null>(null);
+  const sessionEndTime = useRef<number | null>(null);
 
   const cleanup = useCallback(() => {
     if (stopTimeoutRef.current) {
@@ -30,17 +32,33 @@ export const useAzureSpeechRecognition = (onTranscript: (text: string) => void):
     setIsListening(false);
   }, []);
 
+  // Fetch token on mount
+  useEffect(() => {
+    let isMounted = true;
+    fetchSpeechToken()
+      .then(({ token, region }) => {
+        if (isMounted) {
+          setSpeechToken(token);
+          setSpeechRegion(region);
+        }
+      })
+      .catch((err) => {
+        setError('Failed to fetch speech token: ' + (err instanceof Error ? err.message : String(err)));
+      });
+    return () => { isMounted = false; };
+  }, []);
+
   const startListening = useCallback(async () => {
     setError(null);
     cleanup();
     try {
-      if (!AZURE_SPEECH_KEY || !AZURE_SPEECH_REGION) {
-        setError('Azure Speech credentials are missing.');
+      if (!speechToken || !speechRegion) {
+        setError('Speech token or region is missing.');
         return;
       }
-      const speechConfig = SpeechSDK.SpeechConfig.fromSubscription(
-        AZURE_SPEECH_KEY,
-        AZURE_SPEECH_REGION
+      const speechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(
+        speechToken,
+        speechRegion
       );
       speechConfig.speechRecognitionLanguage = 'en-US';
       // Use the default microphone
@@ -48,6 +66,9 @@ export const useAzureSpeechRecognition = (onTranscript: (text: string) => void):
       const recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
       recognizerRef.current = recognizer;
       setIsListening(true);
+      // Mark session start
+      sessionStartTime.current = Date.now();
+      sessionEndTime.current = null;
 
       recognizer.recognizing = () => {
         // Partial results (optional: can be used for live UI feedback)
@@ -63,6 +84,19 @@ export const useAzureSpeechRecognition = (onTranscript: (text: string) => void):
       };
       recognizer.sessionStopped = () => {
         setIsListening(false);
+        // Mark session end
+        sessionEndTime.current = Date.now();
+        // Calculate and send duration
+        if (sessionStartTime.current && sessionEndTime.current) {
+          const durationMs = sessionEndTime.current - sessionStartTime.current;
+          if (durationMs > 0) {
+            fetch('http://localhost:5000/api/stats/speech-duration', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ seconds: durationMs / 1000 })
+            }).catch(() => {/* ignore errors for now */});
+          }
+        }
         cleanup();
       };
       recognizer.startContinuousRecognitionAsync();
@@ -71,7 +105,7 @@ export const useAzureSpeechRecognition = (onTranscript: (text: string) => void):
       setError(err instanceof Error ? err.message : 'Failed to start recognition');
       cleanup();
     }
-  }, [AZURE_SPEECH_KEY, AZURE_SPEECH_REGION, cleanup, onTranscript]);
+  }, [cleanup, onTranscript, speechRegion, speechToken]);
 
   const stopListening = useCallback(() => {
     if (recognizerRef.current) {
