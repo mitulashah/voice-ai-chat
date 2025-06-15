@@ -8,6 +8,7 @@ A voice-based chat application that uses Azure OpenAI's Chat API and Azure Speec
 - Text-to-speech responses via Azure Cognitive Services Speech SDK
 - Real-time chat interface with message history and AI avatars
 - **Prompty template integration** for structured prompt management
+- Supports multiple personas and prompt templates (easily extendable)
 - Built with React 19, TypeScript, and Material-UI (MUI) v7 on the frontend
 - Node.js/Express backend with TypeScript
 - Azure OpenAI integration for natural language processing
@@ -29,7 +30,7 @@ A voice-based chat application that uses Azure OpenAI's Chat API and Azure Speec
 
 1. Navigate to the server directory:
    ```powershell
-   cd server
+   cd d:\code\voice-ai-chat\server
    ```
 
 2. Install dependencies:
@@ -56,7 +57,7 @@ A voice-based chat application that uses Azure OpenAI's Chat API and Azure Speec
 
 1. Navigate to the client directory:
    ```powershell
-   cd client
+   cd d:\code\voice-ai-chat\client
    ```
 
 2. Install dependencies:
@@ -86,15 +87,8 @@ voice-ai-chat/
 │   ├── public/             # Static files
 │   └── src/                # Source files
 │       ├── components/      # React components
-│       │   ├── AIAvatar.tsx
-│       │   ├── ChatHeader.tsx
-│       │   └── ChatInterface.tsx
 │       ├── hooks/          # Custom React hooks
-│       │   ├── useAudioPlayer.ts
-│       │   ├── useAzureSpeechRecognition.ts
-│       │   └── useRetry.ts
 │       ├── worklets/       # Audio worklet processors
-│       │   └── pcm-processor.js
 │       ├── App.tsx         # Main App component
 │       └── main.tsx        # Entry point
 └── server/                 # Backend server
@@ -107,29 +101,19 @@ voice-ai-chat/
     └── package.json        # Backend dependencies
 ```
 
+## Personas & Prompts
+
+The app supports multiple personas and prompt templates, which can be easily extended by adding new files to the appropriate folders. See the `server/src/personas/` and `server/src/prompts/` directories for examples.
+
 ## Prompty Templates
 
 This application uses Microsoft's Prompty format for managing prompt templates. Prompty provides a standardized way to define, version, and manage LLM prompts with YAML frontmatter and template content.
 
-### Available Templates
-
-- **training-agent.prompty**: The default voice-optimized training assistant
-- **code-review.prompty**: Specialized template for code review assistance
-
-### Template Configuration
-
 Templates are located in `server/src/prompts/` and can be configured via environment variables:
 
 ```env
-PROMPTY_TEMPLATE=training-agent
+PROMPTY_TEMPLATE=your-template-name
 ```
-
-### Template Features
-
-- **Environment Variable Support**: Templates can reference Azure configuration via `${env:VARIABLE_NAME}`
-- **Parameter Substitution**: Dynamic content using `{{variable_name}}` syntax
-- **Conditional Blocks**: Show/hide content based on parameters with `{% if condition %}`
-- **Model Configuration**: Each template can specify its own model parameters (temperature, max_tokens, etc.)
 
 For more details, see the [Prompts README](server/src/prompts/README.md).
 
@@ -144,37 +128,46 @@ For more details, see the [Prompts README](server/src/prompts/README.md).
 - `AZURE_OPENAI_MODEL`: The model to use (e.g., gpt-4, gpt-4o)
 - `AZURE_SPEECH_KEY`: Your Azure Speech Services API key
 - `AZURE_SPEECH_REGION`: Your Azure Speech Services region
-- `PROMPTY_TEMPLATE`: The Prompty template to use (default: training-agent)
+- `PROMPTY_TEMPLATE`: The Prompty template to use
 
-## Dependencies
+## Dependencies (2025)
 
-### Frontend Dependencies
+### Frontend
+- react@19.1.0
+- @mui/material@7.1.1
+- @mui/icons-material@7.1.1
+- axios@1.9.0
+- microsoft-cognitiveservices-speech-sdk@1.44.1
+- react-error-boundary@6.0.0
+- react-markdown@10.1.0
+- react-router-dom@7.6.2
+- remark-gfm@4.0.1
 
-- **React 19** - Frontend framework
-- **TypeScript** - Type safety and better developer experience
-- **Material-UI (MUI) v7** - UI component library
-- **Emotion** - CSS-in-JS library for styling
-- **Framer Motion** - Animation library
-- **Axios** - HTTP client for API requests
-- **React Error Boundary** - Error handling components
-- **React Router DOM** - Client-side routing
-- **DiceBear** - Avatar generation library
-- **Vite** - Build tool and development server
+### Backend
+- express@5.1.0
+- typescript@5.8.3
+- ts-node@10.9.2
+- @azure/openai@2.0.0
+- axios@1.10.0
+- chokidar@4.0.3
+- cors@2.8.5
+- dotenv@16.5.0
+- fs-extra@11.3.0
+- js-yaml@4.1.0
+- microsoft-cognitiveservices-speech-sdk@1.44.1
+- openai@5.2.0
+- sql.js@1.13.0
 
-### Backend Dependencies
-
-- **Node.js/Express** - Server framework
-- **TypeScript** - Type safety
-- **Azure OpenAI SDK** - Azure OpenAI integration
-- **Microsoft Cognitive Services Speech SDK** - Azure Speech Services
-- **Azure Identity** - Azure authentication
-- **CORS** - Cross-origin resource sharing
-- **dotenv** - Environment variable management
-- **ts-node** - TypeScript execution for development
+#### Backend Dev Dependencies
+- @types/express@5.0.3
+- @types/fs-extra@11.0.4
+- @types/js-yaml@4.0.9
+- @types/cors@2.8.19
+- @types/sql.js@1.4.9
 
 ## Backend API Structure (2025 Refactor)
 
-The server code in `server/` is now modular and organized for maintainability:
+The server code in `server/` is modular and organized for maintainability:
 
 - **src/routes/** — All API endpoints, grouped by feature (e.g., `personas.ts`, `templates.ts`, `chat.ts`, `speech.ts`).
 - **src/services/** — Business logic and utility functions for each feature.
@@ -187,14 +180,6 @@ The server code in `server/` is now modular and organized for maintainability:
 2. Add business logic in `src/services/` if needed.
 3. Add or reuse types in `src/types/`.
 4. Register the new router in `src/index.ts`.
-
-### Refactor Steps Completed
-- All endpoints are now modular and tested.
-- Business logic is separated from routing.
-- Centralized error handling and config.
-- Type safety across the backend.
-
-See `docs/features/plan-api.md` for the full refactor plan and checklist.
 
 ## License
 
