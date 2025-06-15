@@ -50,3 +50,5 @@ Thumbs.db
 *.aac
 *.flac
 # End media files
+
+server/data/
