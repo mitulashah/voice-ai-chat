@@ -94,6 +94,9 @@ class DatabaseServiceFactory {
                         watchFiles: true,
                         syncOnStartup: true
                     });
+                    if (this.database instanceof file_sync_database_1.FileSyncDatabase) {
+                        yield this.database.initialize();
+                    }
                     console.log('📊 Using FileSyncDatabase (production mode)');
                 }
                 else {
@@ -105,6 +108,9 @@ class DatabaseServiceFactory {
                         watchFiles: true,
                         syncOnStartup: true
                     });
+                    if (this.database instanceof file_sync_database_1.FileSyncDatabase) {
+                        yield this.database.initialize();
+                    }
                     console.log('🔥 Using FileSyncDatabase (development mode)');
                 }
                 // Wait for database to be ready

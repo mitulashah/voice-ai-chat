@@ -71,9 +71,18 @@ class FileSyncDatabase extends document_database_1.DocumentDatabase {
             try {
                 const files = yield promises_1.default.readdir(this.personasDir);
                 const jsonFiles = files.filter(f => f.endsWith('.json'));
+                const fileIds = new Set(jsonFiles.map(f => path_1.default.basename(f, '.json')));
                 console.log(`📂 Found ${jsonFiles.length} persona files to sync`);
                 for (const file of jsonFiles) {
                     yield this.syncPersonaFile(path_1.default.join(this.personasDir, file));
+                }
+                // Remove personas from DB that no longer exist on disk
+                const dbPersonas = this.getAllPersonas();
+                for (const persona of dbPersonas) {
+                    if (!fileIds.has(persona.id)) {
+                        this.deleteDocument(persona.id, 'persona');
+                        console.log(`🗑️  Removed stale persona from DB: ${persona.id}`);
+                    }
                 }
             }
             catch (error) {
@@ -87,9 +96,18 @@ class FileSyncDatabase extends document_database_1.DocumentDatabase {
             try {
                 const files = yield promises_1.default.readdir(this.templatesDir);
                 const promptyFiles = files.filter(f => f.endsWith('.prompty'));
+                const fileIds = new Set(promptyFiles.map(f => path_1.default.basename(f, '.prompty')));
                 console.log(`📂 Found ${promptyFiles.length} template files to sync`);
                 for (const file of promptyFiles) {
                     yield this.syncTemplateFile(path_1.default.join(this.templatesDir, file));
+                }
+                // Remove templates from DB that no longer exist on disk
+                const dbTemplates = this.getAllTemplates();
+                for (const template of dbTemplates) {
+                    if (!fileIds.has(template.id)) {
+                        this.deleteDocument(template.id, 'prompt_template');
+                        console.log(`🗑️  Removed stale template from DB: ${template.id}`);
+                    }
                 }
             }
             catch (error) {

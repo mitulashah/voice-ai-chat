@@ -61,9 +61,18 @@ export class FileSyncDatabase extends DocumentDatabase {
     try {
       const files = await fs.readdir(this.personasDir);
       const jsonFiles = files.filter(f => f.endsWith('.json'));
+      const fileIds = new Set(jsonFiles.map(f => path.basename(f, '.json')));
       console.log(`📂 Found ${jsonFiles.length} persona files to sync`);
       for (const file of jsonFiles) {
         await this.syncPersonaFile(path.join(this.personasDir, file));
+      }
+      // Remove personas from DB that no longer exist on disk
+      const dbPersonas = this.getAllPersonas();
+      for (const persona of dbPersonas) {
+        if (!fileIds.has(persona.id)) {
+          this.deleteDocument(persona.id, 'persona');
+          console.log(`🗑️  Removed stale persona from DB: ${persona.id}`);
+        }
       }
     } catch (error) {
       console.error('❌ Error syncing personas:', error);
@@ -75,9 +84,18 @@ export class FileSyncDatabase extends DocumentDatabase {
     try {
       const files = await fs.readdir(this.templatesDir);
       const promptyFiles = files.filter(f => f.endsWith('.prompty'));
+      const fileIds = new Set(promptyFiles.map(f => path.basename(f, '.prompty')));
       console.log(`📂 Found ${promptyFiles.length} template files to sync`);
       for (const file of promptyFiles) {
         await this.syncTemplateFile(path.join(this.templatesDir, file));
+      }
+      // Remove templates from DB that no longer exist on disk
+      const dbTemplates = this.getAllTemplates();
+      for (const template of dbTemplates) {
+        if (!fileIds.has(template.id)) {
+          this.deleteDocument(template.id, 'prompt_template');
+          console.log(`🗑️  Removed stale template from DB: ${template.id}`);
+        }
       }
     } catch (error) {
       console.error('❌ Error syncing templates:', error);

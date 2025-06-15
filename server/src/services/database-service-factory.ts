@@ -63,6 +63,9 @@ export class DatabaseServiceFactory {
           watchFiles: true,
           syncOnStartup: true
         });
+        if (this.database instanceof FileSyncDatabase) {
+          await this.database.initialize();
+        }
         console.log('📊 Using FileSyncDatabase (production mode)');
       } else {
         // Development: Use FileSyncDatabase for hot reloading
@@ -73,6 +76,9 @@ export class DatabaseServiceFactory {
           watchFiles: true,
           syncOnStartup: true
         });
+        if (this.database instanceof FileSyncDatabase) {
+          await this.database.initialize();
+        }
         console.log('🔥 Using FileSyncDatabase (development mode)');
       }
 

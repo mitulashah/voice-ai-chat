@@ -13,6 +13,11 @@ class StatsService {
     recordAudioChars(count) {
         this.stats.audioCharacterCount += count;
     }
+    resetStats() {
+        this.stats.llmTokenCount = 0;
+        this.stats.speechDurationSeconds = 0;
+        this.stats.audioCharacterCount = 0;
+    }
     getStats() {
         return Object.assign({}, this.stats);
     }

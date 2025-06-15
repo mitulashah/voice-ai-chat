@@ -15,6 +15,12 @@ class StatsService {
     this.stats.audioCharacterCount += count;
   }
 
+  resetStats(): void {
+    this.stats.llmTokenCount = 0;
+    this.stats.speechDurationSeconds = 0;
+    this.stats.audioCharacterCount = 0;
+  }
+
   getStats(): Stats {
     return { ...this.stats };
   }

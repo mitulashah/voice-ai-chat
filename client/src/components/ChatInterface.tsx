@@ -337,7 +337,15 @@ const ChatInterface: React.FC = () => {
      {/* Export JSON Dialog */}
      <ExportDialog
        exportJson={exportJson}
-       onClose={() => setExportJson(null)}
+       onClose={async () => {
+         setExportJson(null);
+         try {
+           await fetch('http://localhost:5000/api/stats/reset', { method: 'POST' });
+         } catch (e) {
+           // Optionally handle error
+           console.error('Failed to reset stats:', e);
+         }
+       }}
        onDownload={(json) => {
          const blob = new Blob([json], { type: 'application/json' });
          const url = URL.createObjectURL(blob);

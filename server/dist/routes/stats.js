@@ -23,4 +23,9 @@ router.post('/speech-duration', (req, res) => {
     console.log('Updated stats:', statsService_1.default.getStats());
     res.status(204).send();
 });
+// POST /api/stats/reset - reset all stats to zero
+router.post('/reset', (_req, res) => {
+    statsService_1.default.resetStats();
+    res.status(204).send();
+});
 exports.default = router;
