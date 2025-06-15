@@ -27,8 +27,8 @@ if (env_1.config.azureOpenAiEndpoint && env_1.config.azureOpenAiKey) {
         defaultHeaders: { 'api-key': env_1.config.azureOpenAiKey },
     });
 }
-function getChatCompletion(messages) {
-    return __awaiter(this, void 0, void 0, function* () {
+function getChatCompletion(messages_1) {
+    return __awaiter(this, arguments, void 0, function* (messages, statsSvc = statsService_1.default) {
         var _a, _b;
         if (!openai)
             throw new Error('OpenAI client not initialized');
@@ -60,19 +60,17 @@ function getChatCompletion(messages) {
             });
             // Record token usage
             if ((_a = completion.usage) === null || _a === void 0 ? void 0 : _a.total_tokens) {
-                statsService_1.default.recordTokens(completion.usage.total_tokens);
+                statsSvc.recordTokens(completion.usage.total_tokens);
             }
             return Object.assign(Object.assign({}, completion.choices[0].message), { usage: completion.usage });
         }
         catch (error) {
-            // Retry once on error
             const retryCompletion = yield openai.chat.completions.create({
                 model: env_1.config.azureOpenAiModel,
                 messages: messagesForOpenAi,
             });
-            // Record token usage on retry
             if ((_b = retryCompletion.usage) === null || _b === void 0 ? void 0 : _b.total_tokens) {
-                statsService_1.default.recordTokens(retryCompletion.usage.total_tokens);
+                statsSvc.recordTokens(retryCompletion.usage.total_tokens);
             }
             return Object.assign(Object.assign({}, retryCompletion.choices[0].message), { usage: retryCompletion.usage });
         }

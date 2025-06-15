@@ -32,11 +32,21 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getAllTemplates = getAllTemplates;
 exports.getTemplateById = getTemplateById;
 exports.searchTemplates = searchTemplates;
 exports.getTemplatesByModel = getTemplatesByModel;
+exports.getAllTemplateNames = getAllTemplateNames;
 const path = __importStar(require("path"));
 const fs = __importStar(require("fs"));
 const promptyLoader_1 = require("../prompts/promptyLoader");
@@ -44,20 +54,15 @@ const database_service_factory_1 = require("./database-service-factory");
 /**
  * Get all templates - uses database if available, falls back to files
  */
-function getAllTemplates() {
+function getAllTemplates(dbInstance) {
     try {
-        // Try database first
-        if (database_service_factory_1.databaseServiceFactory.shouldUseDatabase()) {
-            const db = database_service_factory_1.databaseServiceFactory.getDatabase();
-            if (db) {
-                const templates = db.getAllTemplates();
-                console.log(`📊 Retrieved ${templates.length} templates from database`);
-                // Convert to expected format for API compatibility
-                return templates.map(template => {
-                    var _a, _b;
-                    return (Object.assign({ id: template.id || template.name, name: ((_a = template.metadata) === null || _a === void 0 ? void 0 : _a.name) || template.name, description: ((_b = template.metadata) === null || _b === void 0 ? void 0 : _b.description) || template.description, prompt: template.content, metadata: template.metadata }, template));
-                });
-            }
+        const db = dbInstance !== null && dbInstance !== void 0 ? dbInstance : (database_service_factory_1.databaseServiceFactory.shouldUseDatabase() ? database_service_factory_1.databaseServiceFactory.getDatabase() : null);
+        if (db) {
+            const templates = db.getAllTemplates();
+            return templates.map((template) => {
+                var _a, _b;
+                return (Object.assign({ id: template.id || template.name, name: ((_a = template.metadata) === null || _a === void 0 ? void 0 : _a.name) || template.name, description: ((_b = template.metadata) === null || _b === void 0 ? void 0 : _b.description) || template.description, prompt: template.content, metadata: template.metadata }, template));
+            });
         }
         // Fallback to file system
         console.log('📁 Falling back to file-based template retrieval');
@@ -71,89 +76,80 @@ function getAllTemplates() {
 /**
  * Get template by ID - uses database if available, falls back to files
  */
-function getTemplateById(id) {
+function getTemplateById(id, dbInstance) {
     var _a, _b;
     try {
-        // Try database first
-        if (database_service_factory_1.databaseServiceFactory.shouldUseDatabase()) {
-            const db = database_service_factory_1.databaseServiceFactory.getDatabase();
-            if (db) {
-                const template = db.getTemplateById(id);
-                if (template) {
-                    console.log(`📊 Retrieved template '${id}' from database`);
-                    // Convert to expected format for API compatibility
-                    return Object.assign({ id: template.id || id, name: ((_a = template.metadata) === null || _a === void 0 ? void 0 : _a.name) || template.name, description: ((_b = template.metadata) === null || _b === void 0 ? void 0 : _b.description) || template.description, prompt: template.content, metadata: template.metadata }, template);
-                }
+        const db = dbInstance !== null && dbInstance !== void 0 ? dbInstance : (database_service_factory_1.databaseServiceFactory.shouldUseDatabase() ? database_service_factory_1.databaseServiceFactory.getDatabase() : null);
+        if (db) {
+            const template = db.getTemplateById(id);
+            if (template) {
+                return Object.assign({ id: template.id || id, name: ((_a = template.metadata) === null || _a === void 0 ? void 0 : _a.name) || template.name, description: ((_b = template.metadata) === null || _b === void 0 ? void 0 : _b.description) || template.description, prompt: template.content, metadata: template.metadata }, template);
             }
         }
-        // Fallback to file system
-        console.log(`📁 Falling back to file-based retrieval for template '${id}'`);
         return getTemplateFromFile(id);
     }
     catch (error) {
-        console.error(`❌ Error retrieving template '${id}' from database, falling back to files:`, error);
         return getTemplateFromFile(id);
     }
 }
 /**
  * Search templates by term - database only feature with file fallback
  */
-function searchTemplates(searchTerm) {
+function searchTemplates(searchTerm, dbInstance) {
     try {
-        // Try database search (advanced feature)
-        if (database_service_factory_1.databaseServiceFactory.shouldUseDatabase()) {
-            const db = database_service_factory_1.databaseServiceFactory.getDatabase();
-            if (db) {
-                const results = db.searchDocuments('prompt_template', searchTerm);
-                console.log(`🔍 Search for '${searchTerm}' found ${results.length} templates in database`);
-                // Convert to expected format
-                return results.map(template => {
-                    var _a, _b;
-                    return (Object.assign({ id: template.id || template.name, name: ((_a = template.metadata) === null || _a === void 0 ? void 0 : _a.name) || template.name, description: ((_b = template.metadata) === null || _b === void 0 ? void 0 : _b.description) || template.description, prompt: template.content, metadata: template.metadata }, template));
-                });
-            }
+        const db = dbInstance !== null && dbInstance !== void 0 ? dbInstance : (database_service_factory_1.databaseServiceFactory.shouldUseDatabase() ? database_service_factory_1.databaseServiceFactory.getDatabase() : null);
+        if (db) {
+            const results = db.searchDocuments('prompt_template', searchTerm);
+            return results.map((template) => {
+                var _a, _b;
+                return (Object.assign({ id: template.id || template.name, name: ((_a = template.metadata) === null || _a === void 0 ? void 0 : _a.name) || template.name, description: ((_b = template.metadata) === null || _b === void 0 ? void 0 : _b.description) || template.description, prompt: template.content, metadata: template.metadata }, template));
+            });
         }
-        // Fallback: simple file-based search
-        console.log(`📁 Falling back to file-based search for '${searchTerm}'`);
         const allTemplates = getTemplatesFromFiles();
-        return allTemplates.filter(template => JSON.stringify(template).toLowerCase().includes(searchTerm.toLowerCase()));
+        return allTemplates.filter((template) => JSON.stringify(template).toLowerCase().includes(searchTerm.toLowerCase()));
     }
     catch (error) {
-        console.error(`❌ Error searching templates for '${searchTerm}':`, error);
         return [];
     }
 }
 /**
  * Get templates by model type - database feature with file fallback
  */
-function getTemplatesByModel(modelType) {
+function getTemplatesByModel(modelType, dbInstance) {
     try {
-        // Try database query
-        if (database_service_factory_1.databaseServiceFactory.shouldUseDatabase()) {
-            const db = database_service_factory_1.databaseServiceFactory.getDatabase();
-            if (db) {
-                const allTemplates = db.getAllTemplates();
-                const results = allTemplates.filter(template => {
-                    var _a, _b, _c, _d, _e;
-                    return ((_c = (_b = (_a = template.metadata) === null || _a === void 0 ? void 0 : _a.model) === null || _b === void 0 ? void 0 : _b.api) === null || _c === void 0 ? void 0 : _c.toLowerCase().includes(modelType.toLowerCase())) ||
-                        ((_e = (_d = template.model) === null || _d === void 0 ? void 0 : _d.api) === null || _e === void 0 ? void 0 : _e.toLowerCase().includes(modelType.toLowerCase()));
-                });
-                console.log(`📊 Found ${results.length} templates for model type '${modelType}' in database`);
-                return results.map(template => {
-                    var _a, _b;
-                    return (Object.assign({ id: template.id || template.name, name: ((_a = template.metadata) === null || _a === void 0 ? void 0 : _a.name) || template.name, description: ((_b = template.metadata) === null || _b === void 0 ? void 0 : _b.description) || template.description, prompt: template.content, metadata: template.metadata }, template));
-                });
-            }
+        const db = dbInstance !== null && dbInstance !== void 0 ? dbInstance : (database_service_factory_1.databaseServiceFactory.shouldUseDatabase() ? database_service_factory_1.databaseServiceFactory.getDatabase() : null);
+        if (db) {
+            const allTemplates = db.getAllTemplates();
+            const results = allTemplates.filter((template) => {
+                var _a, _b, _c, _d, _e;
+                return ((_c = (_b = (_a = template.metadata) === null || _a === void 0 ? void 0 : _a.model) === null || _b === void 0 ? void 0 : _b.api) === null || _c === void 0 ? void 0 : _c.toLowerCase().includes(modelType.toLowerCase())) ||
+                    ((_e = (_d = template.model) === null || _d === void 0 ? void 0 : _d.api) === null || _e === void 0 ? void 0 : _e.toLowerCase().includes(modelType.toLowerCase()));
+            });
+            return results.map((template) => {
+                var _a, _b;
+                return (Object.assign({ id: template.id || template.name, name: ((_a = template.metadata) === null || _a === void 0 ? void 0 : _a.name) || template.name, description: ((_b = template.metadata) === null || _b === void 0 ? void 0 : _b.description) || template.description, prompt: template.content, metadata: template.metadata }, template));
+            });
         }
-        // Fallback: filter file-based templates
-        console.log(`📁 Falling back to file-based filtering for model type '${modelType}'`);
         const allTemplates = getTemplatesFromFiles();
-        return allTemplates.filter(template => { var _a, _b, _c; return (_c = (_b = (_a = template.metadata) === null || _a === void 0 ? void 0 : _a.model) === null || _b === void 0 ? void 0 : _b.api) === null || _c === void 0 ? void 0 : _c.toLowerCase().includes(modelType.toLowerCase()); });
+        return allTemplates.filter((template) => { var _a, _b, _c; return (_c = (_b = (_a = template.metadata) === null || _a === void 0 ? void 0 : _a.model) === null || _b === void 0 ? void 0 : _b.api) === null || _c === void 0 ? void 0 : _c.toLowerCase().includes(modelType.toLowerCase()); });
     }
     catch (error) {
-        console.error(`❌ Error retrieving templates for model type '${modelType}':`, error);
         return [];
     }
+}
+/**
+ * Get all template names (IDs and names) from the database if available
+ */
+function getAllTemplateNames() {
+    return __awaiter(this, void 0, void 0, function* () {
+        if (database_service_factory_1.databaseServiceFactory.shouldUseDatabase()) {
+            const db = database_service_factory_1.databaseServiceFactory.getDatabase();
+            if (db && typeof db.getAllTemplateNames === 'function') {
+                return db.getAllTemplateNames();
+            }
+        }
+        return [];
+    });
 }
 // File-based implementation functions (private)
 function getTemplatesFromFiles() {

@@ -11,7 +11,6 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const templateService_1 = require("../services/templateService");
-const database_service_factory_1 = require("../services/database-service-factory");
 const router = (0, express_1.Router)();
 // GET /api/templates - List all templates
 router.get('/', (_req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -99,34 +98,17 @@ router.get('/model/:modelType', (req, res) => __awaiter(void 0, void 0, void 0, 
         });
     }
 }));
-// DEBUG: List all template IDs and names in the database
+// GET /api/templates/debug-names - List all template IDs and names in the database
 router.get('/debug-names', (_req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const shouldUseDb = database_service_factory_1.databaseServiceFactory.shouldUseDatabase();
-        console.log('DEBUG: shouldUseDatabase:', shouldUseDb);
-        if (shouldUseDb) {
-            const db = database_service_factory_1.databaseServiceFactory.getDatabase();
-            console.log('DEBUG: db instance:', db && db.constructor && db.constructor.name);
-            if (db) {
-                console.log('DEBUG: db methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(db)));
-                if (typeof db.getAllTemplateNames === 'function') {
-                    const names = db.getAllTemplateNames();
-                    console.log('DEBUG /api/templates/debug-names:', names);
-                    res.json({ success: true, templates: names });
-                    return;
-                }
-                else {
-                    console.log('DEBUG: getAllTemplateNames is not a function on db');
-                }
-            }
-            else {
-                console.log('DEBUG: db is null');
-            }
+        const names = yield (0, templateService_1.getAllTemplateNames)();
+        if (names) {
+            res.json({ success: true, templates: names });
+            return;
         }
         res.status(404).json({ success: false, error: 'Database not in use or debug method missing.' });
     }
     catch (error) {
-        console.error('DEBUG: Exception in /debug-names route:', error);
         res.status(500).json({ success: false, error: 'Failed to get template names', details: error instanceof Error ? error.message : 'Unknown error' });
     }
 }));

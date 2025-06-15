@@ -1,28 +1,22 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import { databaseServiceFactory } from './database-service-factory';
+import type { Persona } from '../types/api';
 
 /**
  * Get all personas - uses database if available, falls back to files
  */
-export function getAllPersonas(): any[] {
+export function getAllPersonas(dbInstance?: any): Persona[] {
   try {
-    // Try database first
-    if (databaseServiceFactory.shouldUseDatabase()) {
-      const db = databaseServiceFactory.getDatabase();
-      if (db) {
-        const personas = db.getAllPersonas();
-        console.log(`📊 Retrieved ${personas.length} personas from database`);
-        return personas;
-      }
+    const db = dbInstance ?? (databaseServiceFactory.shouldUseDatabase() ? databaseServiceFactory.getDatabase() : null);
+    if (db) {
+      const personas: any[] = db.getAllPersonas();
+      return personas.map((persona: any): Persona => ({
+        ...persona
+      }));
     }
-    
-    // Fallback to file system
-    console.log('📁 Falling back to file-based persona retrieval');
     return getPersonasFromFiles();
-    
   } catch (error) {
-    console.error('❌ Error retrieving personas from database, falling back to files:', error);
     return getPersonasFromFiles();
   }
 }
@@ -30,26 +24,17 @@ export function getAllPersonas(): any[] {
 /**
  * Get persona by ID - uses database if available, falls back to files
  */
-export function getPersonaById(id: string): any | null {
+export function getPersonaById(id: string, dbInstance?: any): Persona | null {
   try {
-    // Try database first
-    if (databaseServiceFactory.shouldUseDatabase()) {
-      const db = databaseServiceFactory.getDatabase();
-      if (db) {
-        const persona = db.getPersonaById(id);
-        if (persona) {
-          console.log(`📊 Retrieved persona '${id}' from database`);
-          return persona;
-        }
+    const db = dbInstance ?? (databaseServiceFactory.shouldUseDatabase() ? databaseServiceFactory.getDatabase() : null);
+    if (db) {
+      const persona: any = db.getPersonaById(id);
+      if (persona) {
+        return { ...persona };
       }
     }
-    
-    // Fallback to file system
-    console.log(`📁 Falling back to file-based retrieval for persona '${id}'`);
     return getPersonaFromFile(id);
-    
   } catch (error) {
-    console.error(`❌ Error retrieving persona '${id}' from database, falling back to files:`, error);
     return getPersonaFromFile(id);
   }
 }
@@ -57,27 +42,18 @@ export function getPersonaById(id: string): any | null {
 /**
  * Search personas by term - database only feature with file fallback
  */
-export function searchPersonas(searchTerm: string): any[] {
+export function searchPersonas(searchTerm: string, dbInstance?: any): Persona[] {
   try {
-    // Try database search (advanced feature)
-    if (databaseServiceFactory.shouldUseDatabase()) {
-      const db = databaseServiceFactory.getDatabase();
-      if (db) {
-        const results = db.searchDocuments('persona', searchTerm);
-        console.log(`🔍 Search for '${searchTerm}' found ${results.length} personas in database`);
-        return results;
-      }
+    const db = dbInstance ?? (databaseServiceFactory.shouldUseDatabase() ? databaseServiceFactory.getDatabase() : null);
+    if (db) {
+      const results: any[] = db.searchDocuments('persona', searchTerm);
+      return results.map((persona: any): Persona => ({ ...persona }));
     }
-    
-    // Fallback: simple file-based search
-    console.log(`📁 Falling back to file-based search for '${searchTerm}'`);
     const allPersonas = getPersonasFromFiles();
-    return allPersonas.filter(persona => 
+    return allPersonas.filter((persona: any) => 
       JSON.stringify(persona).toLowerCase().includes(searchTerm.toLowerCase())
     );
-    
   } catch (error) {
-    console.error(`❌ Error searching personas for '${searchTerm}':`, error);
     return [];
   }
 }
@@ -85,27 +61,18 @@ export function searchPersonas(searchTerm: string): any[] {
 /**
  * Get personas by age group - database feature with file fallback
  */
-export function getPersonasByAgeGroup(ageGroup: string): any[] {
+export function getPersonasByAgeGroup(ageGroup: string, dbInstance?: any): Persona[] {
   try {
-    // Try database query (if database supports this method)
-    if (databaseServiceFactory.shouldUseDatabase()) {
-      const db = databaseServiceFactory.getDatabase();
-      if (db && 'getPersonasByAgeGroup' in db) {
-        const results = (db as any).getPersonasByAgeGroup(ageGroup);
-        console.log(`📊 Found ${results.length} personas for age group '${ageGroup}' in database`);
-        return results;
-      }
+    const db = dbInstance ?? (databaseServiceFactory.shouldUseDatabase() ? databaseServiceFactory.getDatabase() : null);
+    if (db && 'getPersonasByAgeGroup' in db) {
+      const results: any[] = (db as any).getPersonasByAgeGroup(ageGroup);
+      return results.map((persona: any): Persona => ({ ...persona }));
     }
-    
-    // Fallback: filter file-based personas
-    console.log(`📁 Falling back to file-based filtering for age group '${ageGroup}'`);
     const allPersonas = getPersonasFromFiles();
-    return allPersonas.filter(persona => 
+    return allPersonas.filter((persona: any) => 
       persona.demographics?.ageGroup?.toLowerCase().includes(ageGroup.toLowerCase())
     );
-    
   } catch (error) {
-    console.error(`❌ Error retrieving personas for age group '${ageGroup}':`, error);
     return [];
   }
 }

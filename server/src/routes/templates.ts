@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { getAllTemplates, getTemplateById, searchTemplates, getTemplatesByModel } from '../services/templateService';
+import { getAllTemplates, getTemplateById, searchTemplates, getTemplatesByModel, getAllTemplateNames } from '../services/templateService';
 import type { Template } from '../types/api';
 import { databaseServiceFactory } from '../services/database-service-factory';
 
@@ -91,31 +91,16 @@ router.get('/model/:modelType', async (req: Request, res: Response) => {
   }
 });
 
-// DEBUG: List all template IDs and names in the database
+// GET /api/templates/debug-names - List all template IDs and names in the database
 router.get('/debug-names', async (_req: Request, res: Response) => {
   try {
-    const shouldUseDb = databaseServiceFactory.shouldUseDatabase();
-    console.log('DEBUG: shouldUseDatabase:', shouldUseDb);
-    if (shouldUseDb) {
-      const db = databaseServiceFactory.getDatabase();
-      console.log('DEBUG: db instance:', db && db.constructor && db.constructor.name);
-      if (db) {
-        console.log('DEBUG: db methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(db)));
-        if (typeof db.getAllTemplateNames === 'function') {
-          const names = db.getAllTemplateNames();
-          console.log('DEBUG /api/templates/debug-names:', names);
-          res.json({ success: true, templates: names });
-          return;
-        } else {
-          console.log('DEBUG: getAllTemplateNames is not a function on db');
-        }
-      } else {
-        console.log('DEBUG: db is null');
-      }
+    const names = await getAllTemplateNames();
+    if (names) {
+      res.json({ success: true, templates: names });
+      return;
     }
     res.status(404).json({ success: false, error: 'Database not in use or debug method missing.' });
   } catch (error) {
-    console.error('DEBUG: Exception in /debug-names route:', error);
     res.status(500).json({ success: false, error: 'Failed to get template names', details: error instanceof Error ? error.message : 'Unknown error' });
   }
 });

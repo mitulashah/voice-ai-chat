@@ -14,7 +14,7 @@ if (config.azureOpenAiEndpoint && config.azureOpenAiKey) {
   });
 }
 
-export async function getChatCompletion(messages: any[]) {
+export async function getChatCompletion(messages: any[], statsSvc = statsService): Promise<any> {
   if (!openai) throw new Error('OpenAI client not initialized');
   // Local type for message payload
   type ChatMessagePayload = { role: 'system' | 'user' | 'assistant'; content: string };
@@ -49,18 +49,16 @@ export async function getChatCompletion(messages: any[]) {
     });
     // Record token usage
     if (completion.usage?.total_tokens) {
-      statsService.recordTokens(completion.usage.total_tokens);
+      statsSvc.recordTokens(completion.usage.total_tokens);
     }
     return { ...completion.choices[0].message, usage: completion.usage };
   } catch (error) {
-    // Retry once on error
     const retryCompletion = await openai.chat.completions.create({
       model: config.azureOpenAiModel,
       messages: messagesForOpenAi as any,
     });
-    // Record token usage on retry
     if (retryCompletion.usage?.total_tokens) {
-      statsService.recordTokens(retryCompletion.usage.total_tokens);
+      statsSvc.recordTokens(retryCompletion.usage.total_tokens);
     }
     return { ...retryCompletion.choices[0].message, usage: retryCompletion.usage };
   }

@@ -34,10 +34,10 @@
     "typescript": "^5.8.3"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
     "@types/fs-extra": "^11.0.4",
     "@types/js-yaml": "^4.0.9",
-    "@types/cors": "^2.8.19",
     "@types/sql.js": "^1.4.9"
   }
 }

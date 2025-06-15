@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Box, IconButton, Collapse, Typography, useTheme } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import { useTemplate } from '../context/TemplateContext';
-import type { Template } from '../context/TemplateContext';
+import type { Template } from '../context/template-types';
 
 const MenuBar: React.FC = () => {
   const [open, setOpen] = useState(false);

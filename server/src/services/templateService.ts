@@ -2,30 +2,24 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { PrompyLoader } from '../prompts/promptyLoader';
 import { databaseServiceFactory } from './database-service-factory';
+import type { Template } from '../types/api';
 
 /**
  * Get all templates - uses database if available, falls back to files
  */
-export function getAllTemplates(): any[] {
+export function getAllTemplates(dbInstance?: any): Template[] {
   try {
-    // Try database first
-    if (databaseServiceFactory.shouldUseDatabase()) {
-      const db = databaseServiceFactory.getDatabase();
-      if (db) {
-        const templates = db.getAllTemplates();
-        console.log(`📊 Retrieved ${templates.length} templates from database`);
-        
-        // Convert to expected format for API compatibility
-        return templates.map(template => ({
-          id: template.id || template.name,
-          name: template.metadata?.name || template.name,
-          description: template.metadata?.description || template.description,
-          prompt: template.content,
-          metadata: template.metadata,
-          // Include raw template data for advanced features
-          ...template
-        }));
-      }
+    const db = dbInstance ?? (databaseServiceFactory.shouldUseDatabase() ? databaseServiceFactory.getDatabase() : null);
+    if (db) {
+      const templates: any[] = db.getAllTemplates();
+      return templates.map((template: any): Template => ({
+        id: template.id || template.name,
+        name: template.metadata?.name || template.name,
+        description: template.metadata?.description || template.description,
+        prompt: template.content,
+        metadata: template.metadata,
+        ...template
+      }));
     }
     
     // Fallback to file system
@@ -41,36 +35,24 @@ export function getAllTemplates(): any[] {
 /**
  * Get template by ID - uses database if available, falls back to files
  */
-export function getTemplateById(id: string): any | null {
+export function getTemplateById(id: string, dbInstance?: any): Template | null {
   try {
-    // Try database first
-    if (databaseServiceFactory.shouldUseDatabase()) {
-      const db = databaseServiceFactory.getDatabase();
-      if (db) {
-        const template = db.getTemplateById(id);
-        if (template) {
-          console.log(`📊 Retrieved template '${id}' from database`);
-          
-          // Convert to expected format for API compatibility
-          return {
-            id: template.id || id,
-            name: template.metadata?.name || template.name,
-            description: template.metadata?.description || template.description,
-            prompt: template.content,
-            metadata: template.metadata,
-            // Include raw template data for advanced features
-            ...template
-          };
-        }
+    const db = dbInstance ?? (databaseServiceFactory.shouldUseDatabase() ? databaseServiceFactory.getDatabase() : null);
+    if (db) {
+      const template: any = db.getTemplateById(id);
+      if (template) {
+        return {
+          id: template.id || id,
+          name: template.metadata?.name || template.name,
+          description: template.metadata?.description || template.description,
+          prompt: template.content,
+          metadata: template.metadata,
+          ...template
+        };
       }
     }
-    
-    // Fallback to file system
-    console.log(`📁 Falling back to file-based retrieval for template '${id}'`);
     return getTemplateFromFile(id);
-    
   } catch (error) {
-    console.error(`❌ Error retrieving template '${id}' from database, falling back to files:`, error);
     return getTemplateFromFile(id);
   }
 }
@@ -78,36 +60,25 @@ export function getTemplateById(id: string): any | null {
 /**
  * Search templates by term - database only feature with file fallback
  */
-export function searchTemplates(searchTerm: string): any[] {
+export function searchTemplates(searchTerm: string, dbInstance?: any): Template[] {
   try {
-    // Try database search (advanced feature)
-    if (databaseServiceFactory.shouldUseDatabase()) {
-      const db = databaseServiceFactory.getDatabase();
-      if (db) {
-        const results = db.searchDocuments('prompt_template', searchTerm);
-        console.log(`🔍 Search for '${searchTerm}' found ${results.length} templates in database`);
-        
-        // Convert to expected format
-        return results.map(template => ({
-          id: template.id || template.name,
-          name: template.metadata?.name || template.name,
-          description: template.metadata?.description || template.description,
-          prompt: template.content,
-          metadata: template.metadata,
-          ...template
-        }));
-      }
+    const db = dbInstance ?? (databaseServiceFactory.shouldUseDatabase() ? databaseServiceFactory.getDatabase() : null);
+    if (db) {
+      const results: any[] = db.searchDocuments('prompt_template', searchTerm);
+      return results.map((template: any): Template => ({
+        id: template.id || template.name,
+        name: template.metadata?.name || template.name,
+        description: template.metadata?.description || template.description,
+        prompt: template.content,
+        metadata: template.metadata,
+        ...template
+      }));
     }
-    
-    // Fallback: simple file-based search
-    console.log(`📁 Falling back to file-based search for '${searchTerm}'`);
     const allTemplates = getTemplatesFromFiles();
-    return allTemplates.filter(template => 
+    return allTemplates.filter((template: any) => 
       JSON.stringify(template).toLowerCase().includes(searchTerm.toLowerCase())
     );
-    
   } catch (error) {
-    console.error(`❌ Error searching templates for '${searchTerm}':`, error);
     return [];
   }
 }
@@ -115,42 +86,44 @@ export function searchTemplates(searchTerm: string): any[] {
 /**
  * Get templates by model type - database feature with file fallback
  */
-export function getTemplatesByModel(modelType: string): any[] {
+export function getTemplatesByModel(modelType: string, dbInstance?: any): Template[] {
   try {
-    // Try database query
-    if (databaseServiceFactory.shouldUseDatabase()) {
-      const db = databaseServiceFactory.getDatabase();
-      if (db) {
-        const allTemplates = db.getAllTemplates();
-        const results = allTemplates.filter(template => 
-          template.metadata?.model?.api?.toLowerCase().includes(modelType.toLowerCase()) ||
-          template.model?.api?.toLowerCase().includes(modelType.toLowerCase())
-        );
-        
-        console.log(`📊 Found ${results.length} templates for model type '${modelType}' in database`);
-        
-        return results.map(template => ({
-          id: template.id || template.name,
-          name: template.metadata?.name || template.name,
-          description: template.metadata?.description || template.description,
-          prompt: template.content,
-          metadata: template.metadata,
-          ...template
-        }));
-      }
+    const db = dbInstance ?? (databaseServiceFactory.shouldUseDatabase() ? databaseServiceFactory.getDatabase() : null);
+    if (db) {
+      const allTemplates: any[] = db.getAllTemplates();
+      const results = allTemplates.filter((template: any) => 
+        template.metadata?.model?.api?.toLowerCase().includes(modelType.toLowerCase()) ||
+        template.model?.api?.toLowerCase().includes(modelType.toLowerCase())
+      );
+      return results.map((template: any): Template => ({
+        id: template.id || template.name,
+        name: template.metadata?.name || template.name,
+        description: template.metadata?.description || template.description,
+        prompt: template.content,
+        metadata: template.metadata,
+        ...template
+      }));
     }
-    
-    // Fallback: filter file-based templates
-    console.log(`📁 Falling back to file-based filtering for model type '${modelType}'`);
     const allTemplates = getTemplatesFromFiles();
-    return allTemplates.filter(template => 
+    return allTemplates.filter((template: any) => 
       template.metadata?.model?.api?.toLowerCase().includes(modelType.toLowerCase())
     );
-    
   } catch (error) {
-    console.error(`❌ Error retrieving templates for model type '${modelType}':`, error);
     return [];
   }
+}
+
+/**
+ * Get all template names (IDs and names) from the database if available
+ */
+export async function getAllTemplateNames(): Promise<Array<{ id: string; name: string }>> {
+  if (databaseServiceFactory.shouldUseDatabase()) {
+    const db = databaseServiceFactory.getDatabase();
+    if (db && typeof (db as any).getAllTemplateNames === 'function') {
+      return (db as any).getAllTemplateNames();
+    }
+  }
+  return [];
 }
 
 // File-based implementation functions (private)

@@ -48,25 +48,22 @@ const ChatInterface: React.FC = () => {
     messagesRef.current = messages;
     localStorage.setItem('chatMessages', JSON.stringify(messages));
     localStorage.setItem('totalTokens', totalTokens.toString());
-  }, [messages, totalTokens]);  // Seed the system prompt only on initial mount
+  }, [messages, totalTokens]);
+  // Seed the system prompt only on initial mount
   useEffect(() => {
     if (messages.length === 0 && currentTemplate) {
       setMessages([{ role: 'system', content: currentTemplate.prompt, timestamp: Date.now() }]);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [messages.length, currentTemplate, setMessages]);
   // Reset conversation when the selected scenario/template changes
   useEffect(() => {
     if (!currentTemplate) return;
     const sysMsg: Message = { role: 'system', content: currentTemplate.prompt, timestamp: Date.now() };
-    // Reset messages to only the new system prompt
     setMessages([sysMsg]);
-    // Reset token count
     setTotalTokens(0);
-    // Persist the reset state
     localStorage.setItem('chatMessages', JSON.stringify([sysMsg]));
     localStorage.removeItem('totalTokens');
-  }, [currentTemplate?.id]);  // Track timestamps and end conversation
+  }, [currentTemplate, setMessages, setTotalTokens]);  // Track timestamps and end conversation
   const handleEndConversation = () => {
     if (messages.length === 0) return;
     const endTime = Date.now();
