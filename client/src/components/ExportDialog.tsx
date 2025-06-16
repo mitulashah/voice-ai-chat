@@ -9,14 +9,19 @@ interface ExportDialogProps {
 
 const ExportDialog: React.FC<ExportDialogProps> = ({ exportJson, onClose, onDownload }) => {
   const [stats, setStats] = useState<{ speechDurationSeconds: number; audioCharacterCount: number } | null>(null);
-  
-  // Parse the export data to extract token information
+    // Parse the export data to extract comprehensive information
   const exportData = exportJson ? JSON.parse(exportJson) : null;
-  const totalTokens = exportData?.totalTokensUsed || 0;
-  const messageCount = exportData?.messageCount || 0;
-  const durationMs = exportData?.totalDurationMs || 0;
+  
+  // Legacy support for old export format
+  const totalTokens = exportData?.stats?.totalTokensUsed || exportData?.totalTokensUsed || 0;
+  const messageCount = exportData?.conversation?.messageCount || exportData?.messageCount || 0;
+  const durationMs = exportData?.stats?.totalDurationMs || exportData?.totalDurationMs || 0;
   const durationMinutes = Math.floor(durationMs / 60000);
   const durationSeconds = Math.floor((durationMs % 60000) / 1000);
+  
+  // New comprehensive data
+  const context = exportData?.context || {};
+  const evaluationCriteria = exportData?.evaluationCriteria || {};
   
   // Show "No conversation" if no user messages were sent
   const hasUserMessages = messageCount > 0;
@@ -46,9 +51,85 @@ const ExportDialog: React.FC<ExportDialogProps> = ({ exportJson, onClose, onDown
       fullWidth
       disableRestoreFocus={false}
       disableEnforceFocus={false}
-    >
-      <DialogTitle sx={{ pb: 1, fontSize: '1.1rem' }}>Export Conversation</DialogTitle>
-      <DialogContent sx={{ pt: 1 }}>        
+    >      <DialogTitle sx={{ pb: 1, fontSize: '1.1rem' }}>
+        {exportData?.evaluationCriteria?.scenarioId 
+          ? 'Scenario Evaluation Export' 
+          : 'Export Conversation'
+        }
+      </DialogTitle>
+      <DialogContent sx={{ pt: 1 }}>
+        
+        {/* Context Information - Only show if comprehensive data is available */}
+        {exportData?.context && (
+          <Paper elevation={1} sx={{ p: 1.5, mb: 1.5, bgcolor: '#e8f5e8' }}>
+            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, fontSize: '0.875rem' }}>
+              Evaluation Context
+            </Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, fontSize: '0.75rem' }}>
+              {context.persona && (
+                <Box>
+                  <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                    Persona:
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
+                    {context.persona.name}
+                  </Typography>
+                </Box>
+              )}
+              {context.scenario && (
+                <Box>
+                  <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                    Scenario:
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
+                    {context.scenario.name}
+                  </Typography>
+                </Box>
+              )}
+              {context.mood && (
+                <Box>
+                  <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                    Mood:
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
+                    {context.mood.mood}
+                  </Typography>
+                </Box>
+              )}
+              {context.voice && (
+                <Box>
+                  <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                    Voice:
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
+                    {context.voice}
+                  </Typography>
+                </Box>
+              )}
+              {context.generatedName && (
+                <Box>
+                  <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                    Generated Name:
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
+                    {context.generatedName.full} ({context.generatedName.gender})
+                  </Typography>
+                </Box>
+              )}
+              {context.template && (
+                <Box>
+                  <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                    Template:
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
+                    {context.template.name}
+                  </Typography>
+                </Box>
+              )}
+            </Box>
+          </Paper>
+        )}
+        
         {/* Conversation Statistics */}
         <Paper elevation={1} sx={{ p: 1.5, mb: 1.5, bgcolor: '#f8f9fa' }}>
           <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, fontSize: '0.875rem' }}>
@@ -111,8 +192,55 @@ const ExportDialog: React.FC<ExportDialogProps> = ({ exportJson, onClose, onDown
                 </Box>
               </>
             )}
-          </Box>
-        </Paper>
+          </Box>        </Paper>        {/* Evaluation Criteria - Only show if available */}
+        {exportData?.evaluationCriteria?.suggestedEvaluationAreas && (
+          <Paper elevation={1} sx={{ p: 1.5, mb: 1.5, bgcolor: '#fff3e0' }}>
+            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, fontSize: '0.875rem' }}>
+              {exportData.evaluationCriteria.scenarioDetails?.title 
+                ? `Evaluation Criteria - ${exportData.evaluationCriteria.scenarioDetails.title}`
+                : 'Suggested Evaluation Areas'
+              }
+            </Typography>
+            
+            {/* Show scenario details if available */}
+            {exportData.evaluationCriteria.scenarioDetails && (
+              <Box sx={{ mb: 1.5, p: 1, bgcolor: 'rgba(255,255,255,0.7)', borderRadius: 1 }}>
+                <Typography variant="body2" sx={{ fontSize: '0.75rem', mb: 0.5 }}>
+                  <strong>Type:</strong> {exportData.evaluationCriteria.scenarioDetails.scenarioType}
+                  {exportData.evaluationCriteria.scenarioDetails.difficultyLevel && (
+                    <span> | <strong>Difficulty:</strong> {exportData.evaluationCriteria.scenarioDetails.difficultyLevel}</span>
+                  )}
+                  {exportData.evaluationCriteria.scenarioDetails.expectedDurationSeconds && (
+                    <span> | <strong>Expected Duration:</strong> {Math.round(exportData.evaluationCriteria.scenarioDetails.expectedDurationSeconds / 60)} min</span>
+                  )}
+                </Typography>
+                {exportData.evaluationCriteria.scenarioDetails.description && (
+                  <Typography variant="body2" sx={{ fontSize: '0.75rem', fontStyle: 'italic' }}>
+                    {exportData.evaluationCriteria.scenarioDetails.description}
+                  </Typography>
+                )}
+              </Box>
+            )}
+            
+            <Box component="div" sx={{ pl: 0 }}>
+              {evaluationCriteria.suggestedEvaluationAreas.map((area: string, index: number) => (
+                <Typography 
+                  key={index} 
+                  variant="body2" 
+                  sx={{ 
+                    fontSize: '0.75rem', 
+                    mb: 0.5,
+                    fontWeight: area.includes(':') ? 600 : 400,
+                    color: area.startsWith('  •') ? 'text.secondary' : 'text.primary',
+                    fontFamily: area.startsWith('  •') ? 'monospace' : 'inherit'
+                  }}
+                >
+                  {area}
+                </Typography>
+              ))}
+            </Box>
+          </Paper>
+        )}
 
         {/* JSON Export */}
         <Box 

@@ -24,6 +24,7 @@ import { fetchSubstitutedSystemPrompt } from '../utils/speechApi';
 import { usePersonaScenario } from '../context/PersonaScenarioContext';
 import { useMood } from '../context/MoodContext';
 import type { ScenarioParameters, ChatRequest } from '../context/scenario-parameters';
+import type { EvaluationExportData } from '../context/chat-types';
 
 interface Message {
   role: 'user' | 'assistant' | 'system';
@@ -105,7 +106,7 @@ const ChatInterface: React.FC = () => {
         localStorage.removeItem('totalTokens');
       });
   }, [selectedPersona, selectedScenario, selectedMood, selectedVoice, generatedName, currentTemplate, setMessages, setTotalTokens]);  // Track timestamps and end conversation
-  const handleEndConversation = () => {
+  const handleEndConversation = async () => {
     if (messages.length === 0) return;
     const endTime = Date.now();
     
@@ -113,18 +114,160 @@ const ChatInterface: React.FC = () => {
     const firstUserMessage = messages.find(msg => msg.role === 'user');
     const startTime = firstUserMessage ? firstUserMessage.timestamp : endTime;
     const durationMs = endTime - startTime;
+      // Fetch server-side stats for comprehensive data
+    let serverStats = null;
+    try {
+      const response = await fetch('http://localhost:5000/api/stats');
+      serverStats = await response.json();
+    } catch (error) {
+      console.error('Failed to fetch server stats:', error);
+    }
     
-    const exportData = {
-      messages: messages.map(msg => ({ 
-        role: msg.role, 
-        content: msg.content, 
-        timestamp: msg.timestamp,
-        usage: msg.usage 
-      })),
-      totalDurationMs: durationMs,
-      totalTokensUsed: totalTokens,
-      messageCount: messages.filter(m => m.role !== 'system').length
+    // Fetch scenario details to get evaluation criteria
+    let scenarioDetails = null;
+    let evaluationAreas: string[] = [];
+    if (selectedScenario?.id) {
+      try {
+        const response = await fetch(`http://localhost:5000/api/scenarios/${selectedScenario.id}`);
+        const data = await response.json();
+        if (data.success && data.scenario) {
+          scenarioDetails = data.scenario;
+          
+          // Extract evaluation criteria and convert to array of strings
+          if (scenarioDetails.evaluation_criteria) {
+            const criteria = scenarioDetails.evaluation_criteria;
+            evaluationAreas = [];
+            
+            // Convert each category to readable evaluation areas
+            Object.entries(criteria).forEach(([category, questions]) => {
+              if (Array.isArray(questions)) {
+                // Add category header
+                evaluationAreas.push(`${category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:`);
+                // Add each question as a sub-item
+                questions.forEach((question: string) => {
+                  evaluationAreas.push(`  • ${question}`);
+                });
+              }
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch scenario details:', error);
+        // Fallback to generic evaluation areas if scenario fetch fails
+        evaluationAreas = [
+          "Persona consistency and role adherence",
+          "Mood appropriateness and emotional tone", 
+          "Conversation flow and engagement",
+          "Response quality and relevance",
+          "Token efficiency and performance"
+        ];
+      }
+    } else {
+      // No scenario selected, use generic evaluation areas
+      evaluationAreas = [
+        "Persona consistency and role adherence",
+        "Mood appropriateness and emotional tone",
+        "Conversation flow and engagement", 
+        "Response quality and relevance",
+        "Token efficiency and performance"
+      ];
+    }
+      // Create comprehensive export data with all context
+    const exportData: EvaluationExportData = {
+      // Conversation metadata
+      exportTimestamp: endTime,
+      conversationId: `conv_${startTime}_${endTime}`,
+      
+      // Context information
+      context: {
+        persona: selectedPersona ? {
+          id: selectedPersona.id,
+          name: selectedPersona.name,
+          description: selectedPersona.description,
+          // Note: Full persona details with demographics, behavior, etc. 
+          // are stored server-side and would need to be fetched for complete export
+        } : null,
+        
+        scenario: selectedScenario ? {
+          id: selectedScenario.id,
+          name: selectedScenario.name,
+          description: selectedScenario.description
+        } : null,
+        
+        mood: selectedMood ? {
+          mood: selectedMood.mood,
+          description: selectedMood.description
+        } : null,
+        
+        template: currentTemplate ? {
+          id: currentTemplate.id,
+          name: currentTemplate.name,
+          systemPrompt: currentTemplate.prompt
+        } : null,
+        
+        voice: selectedVoice || null,
+        
+        generatedName: generatedName ? {
+          full: generatedName.full,
+          gender: generatedName.gender
+        } : null
+      },
+      
+      // Conversation data
+      conversation: {
+        messages: messages.map(msg => ({ 
+          role: msg.role, 
+          content: msg.content, 
+          timestamp: msg.timestamp,
+          usage: msg.usage 
+        })),
+        messageCount: messages.filter(m => m.role !== 'system').length,
+        userMessageCount: messages.filter(m => m.role === 'user').length,
+        assistantMessageCount: messages.filter(m => m.role === 'assistant').length,
+        systemMessageCount: messages.filter(m => m.role === 'system').length
+      },
+      
+      // Timing and performance stats
+      stats: {
+        // Conversation timing
+        startTime: startTime,
+        endTime: endTime,
+        totalDurationMs: durationMs,
+        durationFormatted: `${Math.floor(durationMs / 60000)}:${Math.floor((durationMs % 60000) / 1000).toString().padStart(2, '0')}`,
+        
+        // Token usage
+        totalTokensUsed: totalTokens,
+        averageTokensPerMessage: messages.filter(m => m.role !== 'system').length > 0 
+          ? Math.round(totalTokens / messages.filter(m => m.role !== 'system').length) 
+          : 0,
+        
+        // Server-side stats (if available)
+        serverStats: serverStats ? {
+          llmTokenCount: serverStats.llmTokenCount,
+          speechDurationSeconds: serverStats.speechDurationSeconds,
+          audioCharacterCount: serverStats.audioCharacterCount
+        } : null
+      },
+        // Evaluation criteria (for scenario-based evaluation)
+      evaluationCriteria: {
+        scenarioId: selectedScenario?.id || null,
+        personaId: selectedPersona?.id || null,
+        moodType: selectedMood?.mood || null,
+        evaluationNotes: scenarioDetails 
+          ? `This export contains comprehensive conversation data for scenario-based evaluation of "${scenarioDetails.title}". Use the scenario-specific criteria below for assessment.`
+          : "This export contains comprehensive conversation data for scenario-based evaluation including persona context, mood state, and performance metrics.",
+        suggestedEvaluationAreas: evaluationAreas,
+        scenarioDetails: scenarioDetails ? {
+          title: scenarioDetails.title,
+          description: scenarioDetails.scenario?.description,
+          scenarioType: scenarioDetails.scenario_type,
+          difficultyLevel: scenarioDetails.difficulty_level,
+          expectedDurationSeconds: scenarioDetails.expected_duration_seconds,
+          exitCriteria: scenarioDetails.exit_criteria
+        } : null
+      }
     };
+    
     const jsonString = JSON.stringify(exportData, null, 2);
     setExportJson(jsonString);
     
@@ -396,8 +539,7 @@ const ChatInterface: React.FC = () => {
             }}
           >
             Clear Chat
-          </Button>
-          <Button
+          </Button>          <Button
             variant="contained"
             onClick={handleEndConversation}
             sx={{
@@ -447,13 +589,35 @@ const ChatInterface: React.FC = () => {
             // Optionally handle error
             console.error('Failed to reset stats:', e);
           }
-        }}
-        onDownload={(json) => {
+        }}        onDownload={(json) => {
+          const exportData = JSON.parse(json);
+          
+          // Create a descriptive filename
+          const timestamp = new Date().toISOString().slice(0, 16).replace(/[-:]/g, '').replace('T', '_');
+          let filename = `conversation_${timestamp}`;
+          
+          // Add context to filename if available
+          if (exportData.context) {
+            const parts = [];
+            if (exportData.context.persona?.name) {
+              parts.push(exportData.context.persona.name.toLowerCase().replace(/\s+/g, '-'));
+            }
+            if (exportData.context.scenario?.name) {
+              parts.push(exportData.context.scenario.name.toLowerCase().replace(/\s+/g, '-'));
+            }
+            if (exportData.context.mood?.mood) {
+              parts.push(exportData.context.mood.mood.toLowerCase().replace(/\s+/g, '-'));
+            }
+            if (parts.length > 0) {
+              filename = `evaluation_${parts.join('_')}_${timestamp}`;
+            }
+          }
+          
           const blob = new Blob([json], { type: 'application/json' });
           const url = URL.createObjectURL(blob);
           const link = document.createElement('a');
           link.href = url;
-          link.download = 'conversation.json';
+          link.download = `${filename}.json`;
           link.click();
           URL.revokeObjectURL(url);
           setExportJson(null);
