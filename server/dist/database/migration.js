@@ -112,7 +112,9 @@ class DatabaseMigration {
                             const stats = fs.statSync(filePath);
                             // Parse prompty file (basic YAML frontmatter parsing)
                             const document = this.parsePromptyFile(fileContent);
-                            this.db.upsertDocument(id, 'prompt_template', ((_a = document.metadata) === null || _a === void 0 ? void 0 : _a.name) || id, document, filePath, stats.mtime);
+                            // Use the name from frontmatter if available, else fallback to id
+                            const templateName = document.name || ((_a = document.metadata) === null || _a === void 0 ? void 0 : _a.name) || id;
+                            this.db.upsertDocument(id, 'prompt_template', templateName, document, filePath, stats.mtime);
                             result.templatesCount++;
                             console.log(`✅ Migrated template: ${id}`);
                         }

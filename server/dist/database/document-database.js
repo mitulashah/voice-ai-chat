@@ -89,7 +89,7 @@ class DocumentDatabase {
         this.db.run(`
       CREATE TABLE IF NOT EXISTS documents (
         id TEXT PRIMARY KEY,
-        type TEXT NOT NULL CHECK (type IN ('persona', 'prompt_template')),
+        type TEXT NOT NULL CHECK (type IN ('persona', 'prompt_template', 'scenario')),
         name TEXT NOT NULL,
         document TEXT NOT NULL,
         file_path TEXT NOT NULL,
@@ -103,6 +103,17 @@ class DocumentDatabase {
         this.db.run(`CREATE INDEX IF NOT EXISTS idx_documents_name ON documents(name)`);
         this.db.run(`CREATE INDEX IF NOT EXISTS idx_documents_file_path ON documents(file_path)`);
         this.db.run(`CREATE INDEX IF NOT EXISTS idx_documents_type_name ON documents(type, name)`);
+        // Create moods table for mood sync
+        this.db.run(`
+      CREATE TABLE IF NOT EXISTS moods (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        mood TEXT NOT NULL UNIQUE,
+        description TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+      )
+    `);
+        this.db.run(`CREATE INDEX IF NOT EXISTS idx_moods_mood ON moods(mood)`);
         console.log('Database schema initialized');
     }
     ensureInitialized() {
@@ -194,6 +205,39 @@ class DocumentDatabase {
         stmt.free();
         return null;
     }
+    getAllScenarios() {
+        this.ensureInitialized();
+        const stmt = this.db.prepare(`
+      SELECT id, name, document 
+      FROM documents 
+      WHERE type = 'scenario' 
+      ORDER BY name
+    `);
+        const results = [];
+        while (stmt.step()) {
+            const row = stmt.getAsObject();
+            results.push(Object.assign({ id: row.id, name: row.name }, JSON.parse(row.document)));
+        }
+        stmt.free();
+        return results;
+    }
+    getScenarioById(id) {
+        this.ensureInitialized();
+        const stmt = this.db.prepare(`
+      SELECT document 
+      FROM documents 
+      WHERE type = 'scenario' AND id = ?
+    `);
+        stmt.bind([id]);
+        if (stmt.step()) {
+            const row = stmt.getAsObject();
+            const result = JSON.parse(row.document);
+            stmt.free();
+            return result;
+        }
+        stmt.free();
+        return null;
+    }
     // Generic document operations
     upsertDocument(id, type, name, document, filePath, fileModified) {
         this.ensureInitialized();
@@ -268,13 +312,15 @@ class DocumentDatabase {
       FROM documents 
       GROUP BY type
     `);
-        const stats = { personas: 0, templates: 0, total: 0 };
+        const stats = { personas: 0, templates: 0, scenarios: 0, total: 0 };
         while (stmt.step()) {
             const row = stmt.getAsObject();
             if (row.type === 'persona')
                 stats.personas = row.count;
             if (row.type === 'prompt_template')
                 stats.templates = row.count;
+            if (row.type === 'scenario')
+                stats.scenarios = row.count;
             stats.total += row.count;
         }
         stmt.free();

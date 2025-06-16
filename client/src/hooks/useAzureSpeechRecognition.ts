@@ -78,10 +78,6 @@ export const useAzureSpeechRecognition = (onTranscript: (text: string) => void):
           onTranscript(e.result.text);
         }
       };
-      recognizer.canceled = (_s, e) => {
-        setError(`Recognition canceled: ${e.errorDetails || e.reason}`);
-        cleanup();
-      };
       recognizer.sessionStopped = () => {
         setIsListening(false);
         // Mark session end
@@ -97,6 +93,10 @@ export const useAzureSpeechRecognition = (onTranscript: (text: string) => void):
             }).catch(() => {/* ignore errors for now */});
           }
         }
+        cleanup();
+      };
+      recognizer.canceled = (_s, e) => {
+        setError(`Recognition canceled: ${e.errorDetails || e.reason}`);
         cleanup();
       };
       recognizer.startContinuousRecognitionAsync();

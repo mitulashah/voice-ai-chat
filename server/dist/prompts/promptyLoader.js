@@ -82,12 +82,15 @@ class PrompyLoader {
         return this.parseTemplate(filePath);
     }
     static renderTemplate(templateName, parameters) {
+        console.log('renderTemplate called with:', { templateName, parameters });
         const template = this.loadTemplate(templateName);
+        console.log('Template content:', template.content);
         // Simple template rendering (replace {{variable}} with values)
         let renderedContent = template.content;
         // Handle conditional blocks {% if variable %}...{% endif %}
         Object.keys(parameters).forEach(key => {
             const value = parameters[key];
+            console.log(`Substituting ${key}:`, value);
             // Replace {% if key %} blocks
             const ifPattern = new RegExp(`{% if ${key} %}([\\s\\S]*?){% endif %}`, 'g');
             if (value) {
@@ -96,13 +99,17 @@ class PrompyLoader {
             else {
                 renderedContent = renderedContent.replace(ifPattern, '');
             }
-            // Replace {{key}} placeholders
-            const placeholder = new RegExp(`{{${key}}}`, 'g');
-            renderedContent = renderedContent.replace(placeholder, String(value || ''));
+            // Replace {{key}} placeholders with actual values - only if placeholder exists
+            const placeholder = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
+            if (renderedContent.match(placeholder)) {
+                renderedContent = renderedContent.replace(placeholder, String(value || ''));
+            }
         });
+        console.log('Rendered content:', renderedContent);
         // Clean up any remaining template syntax
         renderedContent = renderedContent.replace(/{% if \w+ %}|{% endif %}/g, '');
-        renderedContent = renderedContent.replace(/{{[\w_]+}}/g, '');
+        const finalContent = renderedContent.replace(/{{[\w_]+}}/g, '');
+        console.log('Final content after cleanup:', finalContent);
         // Resolve environment variables in configuration
         const resolvedConfig = Object.assign({}, template.metadata.model.configuration);
         Object.keys(resolvedConfig).forEach(key => {

@@ -1,20 +1,30 @@
 import * as sdk from 'microsoft-cognitiveservices-speech-sdk';
 import { config } from '../config/env';
 
-export async function generateSpeech(text: string, voiceGender?: 'male' | 'female'): Promise<Buffer> {
+export async function generateSpeech(text: string, voiceGender?: 'male' | 'female', voiceName?: string): Promise<Buffer> {
   // Determine voice
-  const voiceName = voiceGender === 'male' ? 'en-US-AndrewNeural' : 'en-US-JennyNeural';
+  let resolvedVoiceName: string;
+  if (voiceName) {
+    // Map UI value to Azure full voice name
+    if (voiceName === 'JennyNeural') resolvedVoiceName = 'en-US-JennyNeural';
+    else if (voiceName === 'AndrewNeural') resolvedVoiceName = 'en-US-AndrewNeural';
+    else if (voiceName === 'FableNeural') resolvedVoiceName = 'en-US-FableTurboMultilingualNeural';
+    else resolvedVoiceName = voiceGender === 'male' ? 'en-US-AndrewNeural' : 'en-US-JennyNeural';
+  } else {
+    resolvedVoiceName = voiceGender === 'male' ? 'en-US-AndrewNeural' : 'en-US-JennyNeural';
+  }
+  console.log(`[TTS] Using Azure voice: ${resolvedVoiceName}`);
   return new Promise((resolve, reject) => {
     const speechConfig = sdk.SpeechConfig.fromSubscription(
       config.azureSpeechKey,
       config.azureSpeechRegion
     );
-    speechConfig.speechSynthesisVoiceName = voiceName;
+    speechConfig.speechSynthesisVoiceName = resolvedVoiceName;
     speechConfig.speechSynthesisOutputFormat = sdk.SpeechSynthesisOutputFormat.Audio24Khz160KBitRateMonoMp3;
     const speechSynthesizer = new sdk.SpeechSynthesizer(speechConfig);
     const ssml = `
       <speak version="1.0" xml:lang="en-US">
-        <voice name="${voiceName}">
+        <voice name="${resolvedVoiceName}">
           ${text}
         </voice>
       </speak>

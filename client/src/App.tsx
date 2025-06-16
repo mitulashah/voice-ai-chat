@@ -2,6 +2,7 @@ import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
 import ChatInterface from './components/ChatInterface';
 import TemplateProvider from './context/TemplateContextProvider';
 import ChatProvider from './context/ChatContextProvider';
+import { VoiceProvider } from './context/VoiceContext';
 
 // Create a Spectrum-inspired theme
 const theme = createTheme({
@@ -116,11 +117,13 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <TemplateProvider>
-        <ChatProvider>
-          <ChatInterface />
-        </ChatProvider>
-      </TemplateProvider>
+      <VoiceProvider>
+        <TemplateProvider>
+          <ChatProvider>
+            <ChatInterface />
+          </ChatProvider>
+        </TemplateProvider>
+      </VoiceProvider>
     </ThemeProvider>
   )
 }

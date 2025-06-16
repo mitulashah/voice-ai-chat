@@ -60,24 +60,37 @@ function recognizeSpeech(audioData) {
         return yield (0, speechService_1.processAudioForSpeechRecognition)(audioData);
     });
 }
-function synthesizeSpeech(text, voiceGender) {
+function synthesizeSpeech(text, voiceGender, voiceName) {
     return __awaiter(this, void 0, void 0, function* () {
         if (!text)
             throw new Error('No text provided');
         // Record synthesized audio character count
         statsService_1.default.recordAudioChars(text.length);
-        return yield (0, speechUtil_1.generateSpeech)(text, voiceGender);
+        return yield (0, speechUtil_1.generateSpeech)(text, voiceGender, voiceName);
     });
 }
-function synthesizeSpeechStream(text, voiceGender, res) {
+function synthesizeSpeechStream(text, voiceGender, res, voiceName) {
     return __awaiter(this, void 0, void 0, function* () {
         if (!text)
             throw new Error('No text provided');
         // Record synthesized audio character count
         statsService_1.default.recordAudioChars(text.length);
-        const voiceName = voiceGender === 'male' ? 'en-US-AndrewNeural' : 'en-US-JennyNeural';
+        let resolvedVoiceName;
+        if (voiceName) {
+            if (voiceName === 'JennyNeural')
+                resolvedVoiceName = 'en-US-JennyNeural';
+            else if (voiceName === 'AndrewNeural')
+                resolvedVoiceName = 'en-US-AndrewNeural';
+            else if (voiceName === 'FableNeural')
+                resolvedVoiceName = 'en-US-FableNeural';
+            else
+                resolvedVoiceName = voiceGender === 'male' ? 'en-US-AndrewNeural' : 'en-US-JennyNeural';
+        }
+        else {
+            resolvedVoiceName = voiceGender === 'male' ? 'en-US-AndrewNeural' : 'en-US-JennyNeural';
+        }
         const speechConfig = sdk.SpeechConfig.fromSubscription(env_1.config.azureSpeechKey, env_1.config.azureSpeechRegion);
-        speechConfig.speechSynthesisVoiceName = voiceName;
+        speechConfig.speechSynthesisVoiceName = resolvedVoiceName;
         speechConfig.speechSynthesisOutputFormat = sdk.SpeechSynthesisOutputFormat.Raw16Khz16BitMonoPcm;
         res.setHeader('Content-Type', 'audio/wav');
         res.setHeader('Transfer-Encoding', 'chunked');
@@ -86,7 +99,7 @@ function synthesizeSpeechStream(text, voiceGender, res) {
         const synthesizer = new sdk.SpeechSynthesizer(speechConfig, audioConfig);
         const ssml = `
     <speak version="1.0" xml:lang="en-US">
-      <voice name="${voiceName}">
+      <voice name="${resolvedVoiceName}">
         ${text}
       </voice>
     </speak>

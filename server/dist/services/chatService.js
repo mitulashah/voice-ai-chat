@@ -28,7 +28,7 @@ if (env_1.config.azureOpenAiEndpoint && env_1.config.azureOpenAiKey) {
     });
 }
 function getChatCompletion(messages_1) {
-    return __awaiter(this, arguments, void 0, function* (messages, statsSvc = statsService_1.default) {
+    return __awaiter(this, arguments, void 0, function* (messages, statsSvc = statsService_1.default, parameters) {
         var _a, _b;
         if (!openai)
             throw new Error('OpenAI client not initialized');
@@ -48,7 +48,7 @@ function getChatCompletion(messages_1) {
         }
         else {
             // Fallback to server-side template selection if none provided
-            const { systemMessage, configuration } = templateManager_1.TemplateManager.getContextualPrompt(messages);
+            const { systemMessage, configuration } = yield templateManager_1.TemplateManager.getContextualPrompt(messages, parameters);
             const fallbackSystemMsg = { role: 'system', content: systemMessage };
             messagesForOpenAi = [fallbackSystemMsg, ...windowedNonSystem];
         }

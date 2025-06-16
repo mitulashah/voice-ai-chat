@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Avatar } from '@mui/material';
+import { Box, Typography, Avatar, Chip, useTheme } from '@mui/material';
+import PersonIcon from '@mui/icons-material/Person';
+import MoodIcon from '@mui/icons-material/Mood';
+import TheatersIcon from '@mui/icons-material/Theaters';
+import DescriptionIcon from '@mui/icons-material/Description';
 import { useTemplate } from '../context/TemplateContext';
+import { usePersonaScenario } from '../context/PersonaScenarioContext';
+import { useMood } from '../context/MoodContext';
+import { useVoice } from '../context/VoiceContext';
 
 // Generate a random user ID for avatar
 const getRandomUserId = () => Math.floor(Math.random() * 1000);
@@ -15,11 +22,105 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   avatarUrl,
 }) => {
   const [randomAvatarUrl, setRandomAvatarUrl] = useState<string>('');
-  // Determine which TTS voice will be used based on avatar gender
-  const voiceName = randomAvatarUrl.includes('/men/') ? 'AndrewNeural' : 'JennyNeural';
   const { currentTemplate } = useTemplate();
-  const displayName = currentTemplate?.name || name;
+  const { selectedPersona, selectedScenario, generatedName } = usePersonaScenario();
+  const { selectedMood } = useMood();
+  const { selectedVoice } = useVoice();
+  const theme = useTheme();
   
+  // Create display name: Template Name with Generated Person Name
+  let displayName = currentTemplate?.name || name;
+  if (generatedName && currentTemplate) {
+    displayName = `${currentTemplate.name} with ${generatedName.full}`;
+  }
+
+  // Determine which TTS voice will be used
+  let voiceName = selectedVoice;
+  if (!voiceName) {
+    voiceName = randomAvatarUrl.includes('/men/') ? 'AndrewNeural' : 'JennyNeural';
+  }
+
+  // Compose chips for persona, mood, scenario, template, and voice
+  const chips = [
+    selectedPersona && (
+      <Chip
+        key="persona"
+        icon={<PersonIcon />}
+        label={`Persona: ${selectedPersona.name}`}
+        variant="outlined"
+        size="small"
+        sx={{
+          mr: 1,
+          bgcolor: 'background.paper',
+          color: theme.palette.primary.main,
+          borderColor: theme.palette.primary.light,
+          '& .MuiChip-icon': { color: theme.palette.primary.main },
+        }}
+      />
+    ),
+    selectedMood && (
+      <Chip
+        key="mood"
+        icon={<MoodIcon />}
+        label={`Mood: ${selectedMood.mood}`}
+        variant="outlined"
+        size="small"
+        sx={{
+          mr: 1,
+          bgcolor: 'background.paper',
+          color: theme.palette.warning.main,
+          borderColor: theme.palette.warning.light,
+          '& .MuiChip-icon': { color: theme.palette.warning.main },
+        }}
+      />
+    ),
+    selectedScenario && (
+      <Chip
+        key="scenario"
+        icon={<TheatersIcon />}
+        label={`Scenario: ${selectedScenario.name}`}
+        variant="outlined"
+        size="small"
+        sx={{
+          mr: 1,
+          bgcolor: 'background.paper',
+          color: '#7B1FA2',
+          borderColor: '#CE93D8',
+          '& .MuiChip-icon': { color: '#7B1FA2' },
+        }}
+      />
+    ),
+    currentTemplate && (
+      <Chip
+        key="template"
+        icon={<DescriptionIcon />}
+        label={`Template: ${currentTemplate.name}`}
+        variant="outlined"
+        size="small"
+        sx={{
+          mr: 1,
+          bgcolor: 'background.paper',
+          color: theme.palette.success.main,
+          borderColor: theme.palette.success.light,
+          '& .MuiChip-icon': { color: theme.palette.success.main },
+        }}
+      />
+    ),
+    (
+      <Chip
+        key="voice"
+        label={`Voice: ${voiceName}`}
+        variant="outlined"
+        size="small"
+        sx={{
+          bgcolor: 'background.paper',
+          color: theme.palette.info.main,
+          borderColor: theme.palette.info.light,
+        }}
+      />
+    ),
+  ].filter(Boolean);
+
   useEffect(() => {
     // Use the provided avatarUrl or generate a random one
     if (avatarUrl) {
@@ -52,7 +153,8 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
     >
       {name.charAt(0).toUpperCase()}
     </Avatar>
-  );return (
+  );
+  return (
     <Box
       sx={{
         display: 'flex',
@@ -65,7 +167,8 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
         zIndex: 10,
         mb: 1.5,
       }}
-    >{randomAvatarUrl ? (
+    >
+     {randomAvatarUrl ? (
        <Avatar
          src={randomAvatarUrl}
          alt={name}         sx={{ 
@@ -87,45 +190,17 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
        />
      ) : (
        defaultAvatar
-     )}     <Typography
+     )}
+     <Typography
        variant="h6"
-       component="h1"
-       sx={{
-         fontWeight: 700,
-         background: 'linear-gradient(135deg, #0066cc 0%, #004499 100%)',         WebkitBackgroundClip: 'text',
-         WebkitTextFillColor: 'transparent',
-         textAlign: 'center',
-         mb: 0.375,
-       }}
+       sx={{ fontWeight: 700, color: 'text.primary', mb: 0.5, textAlign: 'center' }}
      >
        {displayName}
      </Typography>
-     <Typography
-       variant="body2"
-       sx={{ 
-         display: 'flex', 
-         alignItems: 'center',
-         color: 'grey.600',
-         fontSize: '0.875rem',
-         fontWeight: 500,
-       }}
-     >       <Box 
-         component="span" 
-         sx={{ 
-           width: 8, 
-           height: 8, 
-           borderRadius: '50%', 
-           background: 'linear-gradient(135deg, #28a745, #20c997)',
-           display: 'inline-block', 
-           mr: 1,
-           boxShadow: '0 0 8px rgba(40, 167, 69, 0.4)',
-         }} 
-       />
-       <Box component="span" sx={{ fontWeight: 600 }}>Online</Box>
-       <Box component="span" sx={{ mx: 1, color: 'grey.400' }}>|</Box>
-       <Box component="span">Voice: {voiceName}</Box>
-     </Typography>
-    </Box>
+     <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 0.5, mb: 0.5 }}>
+       {chips}
+     </Box>
+   </Box>
   );
 };
 

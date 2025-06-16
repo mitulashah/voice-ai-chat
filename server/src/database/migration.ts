@@ -96,10 +96,12 @@ export class DatabaseMigration {
             // Parse prompty file (basic YAML frontmatter parsing)
             const document = this.parsePromptyFile(fileContent);
             
+            // Use the name from frontmatter if available, else fallback to id
+            const templateName = document.name || document.metadata?.name || id;
             this.db.upsertDocument(
               id,
               'prompt_template',
-              document.metadata?.name || id,
+              templateName,
               document,
               filePath,
               stats.mtime

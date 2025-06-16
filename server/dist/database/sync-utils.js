@@ -32,10 +32,14 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SyncUtils = void 0;
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
+const js_yaml_1 = __importDefault(require("js-yaml"));
 class SyncUtils {
     /**
      * Get information about all persona files in a directory
@@ -136,54 +140,16 @@ class SyncUtils {
         }
     }
     /**
-     * Basic YAML parser for frontmatter
+     * Basic YAML parser for frontmatter (now using js-yaml for robust parsing)
      */
     static parseBasicYaml(yamlString) {
-        const result = {};
-        const lines = yamlString.split('\n');
-        let currentKey = '';
-        let currentValue = '';
-        let inMultiLine = false;
-        for (const line of lines) {
-            const trimmedLine = line.trim();
-            if (!trimmedLine || trimmedLine.startsWith('#')) {
-                continue; // Skip empty lines and comments
-            }
-            const colonIndex = line.indexOf(':');
-            if (colonIndex > 0 && !inMultiLine) {
-                // New key-value pair
-                if (currentKey && currentValue !== '') {
-                    result[currentKey] = this.parseYamlValue(currentValue.trim());
-                }
-                currentKey = line.substring(0, colonIndex).trim();
-                currentValue = line.substring(colonIndex + 1).trim();
-                // Check if this is a multi-line value
-                if (currentValue === '|' || currentValue === '>') {
-                    inMultiLine = true;
-                    currentValue = '';
-                }
-            }
-            else if (inMultiLine) {
-                // Continue multi-line value
-                if (line.startsWith('  ')) {
-                    currentValue += (currentValue ? '\n' : '') + line.substring(2);
-                }
-                else {
-                    // End of multi-line value
-                    inMultiLine = false;
-                    if (currentKey) {
-                        result[currentKey] = currentValue;
-                    }
-                    currentKey = '';
-                    currentValue = '';
-                }
-            }
+        try {
+            return js_yaml_1.default.load(yamlString);
         }
-        // Handle last key-value pair
-        if (currentKey && currentValue !== '') {
-            result[currentKey] = this.parseYamlValue(currentValue.trim());
+        catch (err) {
+            console.warn('Failed to parse YAML frontmatter:', err);
+            return {};
         }
-        return result;
     }
     /**
      * Parse individual YAML values

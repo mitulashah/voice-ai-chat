@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import yaml from 'js-yaml';
 
 export interface FileInfo {
   id: string;
@@ -133,59 +134,15 @@ export class SyncUtils {
   }
 
   /**
-   * Basic YAML parser for frontmatter
+   * Basic YAML parser for frontmatter (now using js-yaml for robust parsing)
    */
   private static parseBasicYaml(yamlString: string): Record<string, any> {
-    const result: Record<string, any> = {};
-    const lines = yamlString.split('\n');
-    let currentKey = '';
-    let currentValue = '';
-    let inMultiLine = false;
-
-    for (const line of lines) {
-      const trimmedLine = line.trim();
-      
-      if (!trimmedLine || trimmedLine.startsWith('#')) {
-        continue; // Skip empty lines and comments
-      }
-      
-      const colonIndex = line.indexOf(':');
-      if (colonIndex > 0 && !inMultiLine) {
-        // New key-value pair
-        if (currentKey && currentValue !== '') {
-          result[currentKey] = this.parseYamlValue(currentValue.trim());
-        }
-        
-        currentKey = line.substring(0, colonIndex).trim();
-        currentValue = line.substring(colonIndex + 1).trim();
-        
-        // Check if this is a multi-line value
-        if (currentValue === '|' || currentValue === '>') {
-          inMultiLine = true;
-          currentValue = '';
-        }
-      } else if (inMultiLine) {
-        // Continue multi-line value
-        if (line.startsWith('  ')) {
-          currentValue += (currentValue ? '\n' : '') + line.substring(2);
-        } else {
-          // End of multi-line value
-          inMultiLine = false;
-          if (currentKey) {
-            result[currentKey] = currentValue;
-          }
-          currentKey = '';
-          currentValue = '';
-        }
-      }
+    try {
+      return yaml.load(yamlString) as Record<string, any>;
+    } catch (err) {
+      console.warn('Failed to parse YAML frontmatter:', err);
+      return {};
     }
-    
-    // Handle last key-value pair
-    if (currentKey && currentValue !== '') {
-      result[currentKey] = this.parseYamlValue(currentValue.trim());
-    }
-
-    return result;
   }
 
   /**

@@ -21,8 +21,19 @@ export interface ChatMessage {
   content: string;
 }
 
+export interface ScenarioParameters {
+  persona: string;
+  mood: string;
+  name: string;
+  gender?: 'male' | 'female';
+  voice: string;
+  templateName?: string;
+  scenarioId?: string;
+}
+
 export interface ChatRequest {
   messages: ChatMessage[];
+  parameters?: ScenarioParameters;
 }
 
 export interface ChatResponse {
@@ -39,4 +50,34 @@ export interface Stats {
   llmTokenCount: number;
   speechDurationSeconds: number;
   audioCharacterCount: number;
+}
+
+export interface Scenario {
+  id: string;
+  title: string;
+  scenario: {
+    description: string;
+    context: {
+      device?: string;
+      service?: string;
+      environment?: string;
+      prior_actions?: string[];
+      [key: string]: unknown;
+    };
+  };
+  exit_criteria: {
+    description: string;
+    customer_exit_signals: string[];
+  };
+  evaluation_criteria: {
+    identity_validation?: string[];
+    troubleshooting_steps?: string[];
+    resolution_confirmation?: string[];
+    [key: string]: unknown;
+  };
+  scenario_type: string;
+  difficulty_level?: string;
+  expected_duration_seconds?: number;
+  version?: string;
+  [key: string]: unknown;
 }

@@ -3,6 +3,7 @@ import OpenAI from 'openai';
 // Removed invalid SDK type import; using local types instead
 import { config } from '../config/env';
 import statsService from './statsService';
+import type { ScenarioParameters } from '../types/api';
 
 let openai: OpenAI | null = null;
 if (config.azureOpenAiEndpoint && config.azureOpenAiKey) {
@@ -14,7 +15,7 @@ if (config.azureOpenAiEndpoint && config.azureOpenAiKey) {
   });
 }
 
-export async function getChatCompletion(messages: any[], statsSvc = statsService): Promise<any> {
+export async function getChatCompletion(messages: any[], statsSvc = statsService, parameters?: ScenarioParameters): Promise<any> {
   if (!openai) throw new Error('OpenAI client not initialized');
   // Local type for message payload
   type ChatMessagePayload = { role: 'system' | 'user' | 'assistant'; content: string };
@@ -28,7 +29,6 @@ export async function getChatCompletion(messages: any[], statsSvc = statsService
   // Map to local typed payloads
   const systemMessages: ChatMessagePayload[] = systemMessagesRaw.map(m => ({ role: m.role, content: m.content }));
   const windowedNonSystem: ChatMessagePayload[] = windowedNonSystemRaw.map(m => ({ role: m.role, content: m.content }));
-
   // Build the final messages array for OpenAI, preferring client system prompts
   // Build final array of messages, using our local type
   let messagesForOpenAi: ChatMessagePayload[];
@@ -36,7 +36,7 @@ export async function getChatCompletion(messages: any[], statsSvc = statsService
     messagesForOpenAi = [...systemMessages, ...windowedNonSystem];
   } else {
     // Fallback to server-side template selection if none provided
-    const { systemMessage, configuration } = TemplateManager.getContextualPrompt(messages);
+    const { systemMessage, configuration } = await TemplateManager.getContextualPrompt(messages, parameters);
     const fallbackSystemMsg: ChatMessagePayload = { role: 'system', content: systemMessage };
     messagesForOpenAi = [fallbackSystemMsg, ...windowedNonSystem];
   }

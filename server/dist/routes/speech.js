@@ -26,8 +26,8 @@ router.post('/recognize', (req, res) => __awaiter(void 0, void 0, void 0, functi
 // POST /api/speech/synthesize - Text-to-speech endpoint
 router.post('/synthesize', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { text, voiceGender } = req.body;
-        const audioBuffer = yield (0, speechServiceApi_1.synthesizeSpeech)(text, voiceGender);
+        const { text, voiceGender, voiceName } = req.body;
+        const audioBuffer = yield (0, speechServiceApi_1.synthesizeSpeech)(text, voiceGender, voiceName);
         res.setHeader('Content-Type', 'audio/mp3');
         res.send(audioBuffer);
     }
@@ -38,8 +38,8 @@ router.post('/synthesize', (req, res) => __awaiter(void 0, void 0, void 0, funct
 // POST /api/speech/synthesize/stream - Streaming TTS endpoint
 router.post('/synthesize/stream', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
-        const { text, voiceGender } = req.body;
-        yield (0, speechServiceApi_1.synthesizeSpeechStream)(text, voiceGender, res);
+        const { text, voiceGender, voiceName } = req.body;
+        yield (0, speechServiceApi_1.synthesizeSpeechStream)(text, voiceGender, res, voiceName);
     }
     catch (error) {
         res.status(500).json({ error: 'Speech synthesis streaming failed' });

@@ -12,7 +12,7 @@ export const useAudioPlayer = (): AudioPlayerState => {
   const [currentPlayingId, setCurrentPlayingId] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const playAudio = useCallback(async (text: string, id: string, voiceGender?: string) => {
+  const playAudio = useCallback(async (text: string, id: string, voice?: string) => {
     try {
       if (audioRef.current) {
         audioRef.current.pause();
@@ -22,11 +22,20 @@ export const useAudioPlayer = (): AudioPlayerState => {
       setIsPlaying(true);
       setCurrentPlayingId(id);
 
+      // Determine if voice is a known name or gender
+      let voiceGender: string | undefined;
+      let voiceName: string | undefined;
+      if (voice === 'JennyNeural' || voice === 'AndrewNeural' || voice === 'FableNeural') {
+        voiceName = voice;
+      } else if (voice === 'male' || voice === 'female') {
+        voiceGender = voice;
+      }
+
       // Fetch the full MP3 audio as a blob
       const response = await fetch('http://localhost:5000/api/speech/synthesize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, voiceGender })
+        body: JSON.stringify({ text, voiceGender, voiceName })
       });
       if (!response.ok) throw new Error('Failed to fetch audio');
       const audioBlob = await response.blob();

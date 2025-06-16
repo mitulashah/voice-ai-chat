@@ -14,14 +14,21 @@ export interface FileSyncOptions {
 export class FileSyncDatabase extends DocumentDatabase {
   private personasDir: string;
   private templatesDir: string;
+  private scenariosDir: string;
+  private moodsFile: string;
   private watchFiles: boolean;
   private syncOnStartup: boolean;
   private watchers: FSWatcher[] = [];
+  private scenarioIdMap: Map<string, string> = new Map();
 
   constructor(dbPath: string, options?: FileSyncOptions) {
     super(dbPath);
-    this.personasDir = options?.personasDir || path.join(process.cwd(), 'src', 'personas');
-    this.templatesDir = options?.templatesDir || path.join(process.cwd(), 'src', 'prompts');
+    // Resolve paths relative to server/src directory
+    const baseDir = path.resolve(__dirname, '..');
+    this.personasDir = options?.personasDir || path.join(baseDir, 'personas');
+    this.templatesDir = options?.templatesDir || path.join(baseDir, 'prompts');
+    this.scenariosDir = path.join(baseDir, 'scenarios');
+    this.moodsFile = path.join(baseDir, 'util', 'moods.json');
     this.watchFiles = options?.watchFiles ?? true;
     this.syncOnStartup = options?.syncOnStartup ?? true;
   }
@@ -51,6 +58,8 @@ export class FileSyncDatabase extends DocumentDatabase {
     try {
       await this.syncPersonas();
       await this.syncTemplates();
+      await this.syncScenarios();
+      await this.syncMoods();
     } catch (error) {
       console.error('❌ Error during file sync:', error);
       throw error;
@@ -103,6 +112,51 @@ export class FileSyncDatabase extends DocumentDatabase {
     }
   }
 
+  private async syncScenarios(): Promise<void> {
+    try {
+      // Wipe all existing scenarios to ensure a clean sync
+      if (this.db) {
+        this.db.run("DELETE FROM documents WHERE type = 'scenario'");
+        console.log('🗑️  Cleared existing scenarios from DB');
+      }
+      const files = await fs.readdir(this.scenariosDir);
+      const jsonFiles = files.filter(f => f.endsWith('.json'));
+      console.log(`📂 Found ${jsonFiles.length} scenario files to sync`);
+      for (const file of jsonFiles) {
+        const filePath = path.join(this.scenariosDir, file);
+        await this.syncScenarioFile(filePath);
+      }
+    } catch (error) {
+      console.error('❌ Error syncing scenarios:', error);
+      throw error;
+    }
+  }
+
+  private async syncMoods(): Promise<void> {
+    try {
+      const content = await fs.readFile(this.moodsFile, 'utf-8');
+      const moods = JSON.parse(content);
+      // Remove all existing moods
+      if (this.db) this.db.run('DELETE FROM moods');
+      // Insert all moods from file
+      if (this.db) {
+        const stmt = this.db.prepare('INSERT INTO moods (mood, description) VALUES (?, ?)');
+        for (const entry of moods) {
+          stmt.run([entry.mood, entry.description]);
+        }
+        stmt.free();
+        // Log row count after insert
+        const countResult = this.db.exec('SELECT COUNT(*) as count FROM moods');
+        const count = countResult[0]?.values[0]?.[0] ?? 0;
+        console.log(`[syncMoods] Inserted moods, row count now: ${count}`);
+      }
+      console.log(`🔄 Synced moods from moods.json (${moods.length} moods)`);
+    } catch (error) {
+      console.error('❌ Error syncing moods:', error);
+      throw error;
+    }
+  }
+
   private async syncPersonaFile(filePath: string): Promise<void> {
     try {
       const content = await fs.readFile(filePath, 'utf-8');
@@ -149,6 +203,29 @@ export class FileSyncDatabase extends DocumentDatabase {
       console.log(`🔄 Synced template: ${fileName}`);
     } catch (error) {
       console.error(`❌ Error syncing template file ${filePath}:`, error);
+      throw error;
+    }
+  }
+
+  private async syncScenarioFile(filePath: string): Promise<void> {
+    try {
+      const content = await fs.readFile(filePath, 'utf-8');
+      const scenario = JSON.parse(content);
+      const id = typeof scenario.id === 'string' ? scenario.id : path.basename(filePath, '.json');
+      const key = path.basename(filePath, '.json');
+      this.scenarioIdMap.set(key, id);
+      const stats = await fs.stat(filePath);
+      this.upsertDocument(
+        id,
+        'scenario',
+        scenario.title || id,
+        scenario,
+        filePath,
+        stats.mtime
+      );
+      console.log(`🔄 Synced scenario: ${id}`);
+    } catch (error) {
+      console.error(`❌ Error syncing scenario file ${filePath}:`, error);
       throw error;
     }
   }
@@ -226,6 +303,92 @@ export class FileSyncDatabase extends DocumentDatabase {
         console.log('👁️  Template file watcher ready');
       });
     this.watchers.push(templateWatcher);
+    // Watch scenarios directory
+    const scenarioWatcher = chokidar.watch(
+      path.join(this.scenariosDir, '*.json'),
+      {
+        persistent: true,
+        ignoreInitial: true,
+        awaitWriteFinish: {
+          stabilityThreshold: 300,
+          pollInterval: 100
+        },
+        usePolling: false,
+        alwaysStat: true,
+        depth: 0
+      }
+    );
+    scenarioWatcher
+      .on('add', (filePath) => {
+        console.log(`📁 New scenario file detected: ${filePath}`);
+        this.syncScenarioFile(filePath).catch(console.error);
+      })
+      .on('change', (filePath) => {
+        console.log(`📝 Scenario file changed: ${filePath}`);
+        this.syncScenarioFile(filePath).catch(console.error);
+      })
+      .on('unlink', (filePath) => {
+        console.log(`🗑️  Scenario file deleted: ${filePath}`);
+        const key = path.basename(filePath, '.json');
+        const id = this.scenarioIdMap.get(key) ?? key;
+        if (this.deleteDocument(id, 'scenario')) {
+          console.log(`🗑️  Removed scenario from DB: ${id}`);
+        }
+      })
+      .on('error', (error) => {
+        console.error('❌ Scenario watcher error:', error);
+      })
+      .on('ready', () => {
+        console.log('👁️  Scenario file watcher ready');
+      });
+    this.watchers.push(scenarioWatcher);
+    // Watch moods file
+    const moodsWatcher = chokidar.watch(
+      this.moodsFile,
+      {
+        persistent: true,
+        ignoreInitial: true,
+        awaitWriteFinish: {
+          stabilityThreshold: 300,
+          pollInterval: 100
+        },
+        usePolling: false,
+        alwaysStat: true,
+        depth: 0
+      }
+    );
+    moodsWatcher
+      .on('change', (filePath) => {
+        console.log(`📝 Moods file changed: ${filePath}`);
+        this.syncMoods().catch(console.error);
+      })
+      .on('error', (error) => {
+        console.error('❌ Moods watcher error:', error);
+      })
+      .on('ready', () => {
+        console.log('👁️  Moods file watcher ready');
+      });
+    this.watchers.push(moodsWatcher);
+  }
+
+  // Public method to get all moods from the database
+  public getAllMoods(): { mood: string; description: string }[] {
+    if (!this.db) {
+      console.log('[getAllMoods] No db instance');
+      return [];
+    }
+    const result = this.db.exec('SELECT mood, description FROM moods');
+    console.log('[getAllMoods] Query result:', JSON.stringify(result, null, 2));
+    if (!result[0]) {
+      console.log('[getAllMoods] No result[0]');
+      return [];
+    }
+    const moods = result[0].values.map(([mood, description]) => ({
+      mood: mood ? String(mood) : '',
+      description: description ? String(description) : ''
+    }));
+    console.log('[getAllMoods] Returning moods:', moods);
+    return moods;
   }
 
   // Manual sync methods for testing

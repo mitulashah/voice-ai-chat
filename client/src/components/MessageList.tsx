@@ -3,6 +3,7 @@ import { Box, Avatar, Button, CircularProgress, IconButton, useTheme, styled } f
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { VolumeUp as VolumeUpIcon } from '@mui/icons-material';
+import { useVoice } from '../context/VoiceContext';
 
 const MessageBubble = styled(Box, {
   shouldForwardProp: (prop) => prop !== 'isUser',
@@ -72,10 +73,18 @@ const MessageList: React.FC<MessageListProps> = ({
   messagesEndRef,
 }) => {
   const theme = useTheme();
-
+  const { selectedVoice } = useVoice();
   return (
-    <Box sx={{ flex: 1, overflowY: 'auto', pr: 0.5 }}>
-      {messages.map((message, index) => {
+    <Box sx={{ 
+      flex: 1, 
+      overflowY: 'auto', 
+      pr: 0.5, 
+      minHeight: 0, // Allow flex shrinking
+      display: 'flex',
+      flexDirection: 'column'
+    }}>
+      <Box sx={{ flex: 1 }}>
+        {messages.map((message, index) => {
         if (message.role === 'system') {
           const isExpanded = expandedSystemIndexes.has(index);
           return (
@@ -151,35 +160,37 @@ const MessageList: React.FC<MessageListProps> = ({
                   ...(message.role === 'user' && {
                     bgcolor: 'primary.main',
                     color: 'primary.contrastText',
-                    ml: 'auto',  // push bubble to right
+                    ml: 'auto',
                   }),
                 }}
               >
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
-                {message.role === 'assistant' && (
-                  <IconButton
-                    size="small"
-                    onClick={() => {
-                      const voiceGender = avatarUrl.includes('/men/') ? 'male' : 'female';
-                      playAudio(message.content, `msg-${index}`, voiceGender);
-                    }}
-                    sx={{
-                      position: 'absolute',
-                      right: 4,
-                      bottom: 4,
-                      color: 'inherit',
-                      opacity: 0.7,
-                      '&:hover': { opacity: 1 },
-                    }}
-                  >
-                    {isPlaying && currentPlayingId === `msg-${index}` ? (
-                      <CircularProgress size={16} color="inherit" />
-                    ) : (
-                      <VolumeUpIcon fontSize="small" />
-                    )}
-                  </IconButton>
-                )}
               </MessageBubble>
+              {message.role === 'assistant' && (
+                <IconButton
+                  size="small"
+                  onClick={() => {
+                    let voiceNameOrGender: string | undefined = selectedVoice || undefined;
+                    if (!voiceNameOrGender) {
+                      voiceNameOrGender = avatarUrl.includes('/men/') ? 'male' : 'female';
+                    }
+                    playAudio(message.content, `msg-${index}`, voiceNameOrGender);
+                  }}
+                  sx={{
+                    ml: 0.5,
+                    alignSelf: 'center',
+                    color: 'inherit',
+                    opacity: 0.7,
+                    '&:hover': { opacity: 1 },
+                  }}
+                >
+                  {isPlaying && currentPlayingId === `msg-${index}` ? (
+                    <CircularProgress size={16} color="inherit" />
+                  ) : (
+                    <VolumeUpIcon fontSize="small" />
+                  )}
+                </IconButton>
+              )}
               {message.role === 'user' && (
                 <Avatar
                   sx={{
@@ -226,10 +237,10 @@ const MessageList: React.FC<MessageListProps> = ({
                 })} 1.4s infinite both`,
                 animationDelay: `${i * 0.16}s`,
               }}
-            />
-          ))}
+            />          ))}
         </Box>
       )}
+      </Box>
       {/* anchor element for auto-scrolling */}
       <div ref={messagesEndRef} />
     </Box>

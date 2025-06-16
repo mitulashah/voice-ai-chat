@@ -9,23 +9,31 @@ export async function recognizeSpeech(audioData: string) {
   return await processAudioForSpeechRecognition(audioData);
 }
 
-export async function synthesizeSpeech(text: string, voiceGender?: 'male' | 'female') {
+export async function synthesizeSpeech(text: string, voiceGender?: 'male' | 'female', voiceName?: string) {
   if (!text) throw new Error('No text provided');
   // Record synthesized audio character count
   statsService.recordAudioChars(text.length);
-  return await generateSpeech(text, voiceGender);
+  return await generateSpeech(text, voiceGender, voiceName);
 }
 
-export async function synthesizeSpeechStream(text: string, voiceGender: 'male' | 'female' | undefined, res: any) {
+export async function synthesizeSpeechStream(text: string, voiceGender: 'male' | 'female' | undefined, res: any, voiceName?: string) {
   if (!text) throw new Error('No text provided');
   // Record synthesized audio character count
   statsService.recordAudioChars(text.length);
-  const voiceName = voiceGender === 'male' ? 'en-US-AndrewNeural' : 'en-US-JennyNeural';
+  let resolvedVoiceName: string;
+  if (voiceName) {
+    if (voiceName === 'JennyNeural') resolvedVoiceName = 'en-US-JennyNeural';
+    else if (voiceName === 'AndrewNeural') resolvedVoiceName = 'en-US-AndrewNeural';
+    else if (voiceName === 'FableNeural') resolvedVoiceName = 'en-US-FableNeural';
+    else resolvedVoiceName = voiceGender === 'male' ? 'en-US-AndrewNeural' : 'en-US-JennyNeural';
+  } else {
+    resolvedVoiceName = voiceGender === 'male' ? 'en-US-AndrewNeural' : 'en-US-JennyNeural';
+  }
   const speechConfig = sdk.SpeechConfig.fromSubscription(
     config.azureSpeechKey,
     config.azureSpeechRegion
   );
-  speechConfig.speechSynthesisVoiceName = voiceName;
+  speechConfig.speechSynthesisVoiceName = resolvedVoiceName;
   speechConfig.speechSynthesisOutputFormat = sdk.SpeechSynthesisOutputFormat.Raw16Khz16BitMonoPcm;
   res.setHeader('Content-Type', 'audio/wav');
   res.setHeader('Transfer-Encoding', 'chunked');
@@ -34,7 +42,7 @@ export async function synthesizeSpeechStream(text: string, voiceGender: 'male' |
   const synthesizer = new sdk.SpeechSynthesizer(speechConfig, audioConfig);
   const ssml = `
     <speak version="1.0" xml:lang="en-US">
-      <voice name="${voiceName}">
+      <voice name="${resolvedVoiceName}">
         ${text}
       </voice>
     </speak>

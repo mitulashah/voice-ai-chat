@@ -37,6 +37,7 @@ exports.getAllPersonas = getAllPersonas;
 exports.getPersonaById = getPersonaById;
 exports.searchPersonas = searchPersonas;
 exports.getPersonasByAgeGroup = getPersonasByAgeGroup;
+exports.formatPersonaForTemplate = formatPersonaForTemplate;
 const path = __importStar(require("path"));
 const fs = __importStar(require("fs"));
 const database_service_factory_1 = require("./database-service-factory");
@@ -107,6 +108,48 @@ function getPersonasByAgeGroup(ageGroup, dbInstance) {
     catch (error) {
         return [];
     }
+}
+/**
+ * Format persona details for template substitution
+ */
+function formatPersonaForTemplate(persona) {
+    if (!persona)
+        return {};
+    console.log('PersonaService: Formatting persona for template:', persona);
+    const formatted = {
+        persona_name: persona.name || '',
+        persona_id: persona.id || '',
+    };
+    // Add demographics as separate fields
+    if (persona.demographics) {
+        Object.entries(persona.demographics).forEach(([key, value]) => {
+            formatted[`persona_${key}`] = String(value || '');
+        });
+    }
+    // Add main persona characteristics
+    formatted.persona_behavior = persona.behavior || '';
+    formatted.persona_needs = persona.needs || '';
+    formatted.persona_painpoints = persona.painpoints || '';
+    // Also provide a combined persona description for templates that expect it
+    const parts = [];
+    if (persona.name)
+        parts.push(`Name: ${persona.name}`);
+    if (persona.demographics) {
+        const demo = Object.entries(persona.demographics)
+            .map(([k, v]) => `${k}: ${v}`)
+            .join(', ');
+        if (demo)
+            parts.push(`Demographics: ${demo}`);
+    }
+    if (persona.behavior)
+        parts.push(`Behavior: ${persona.behavior}`);
+    if (persona.needs)
+        parts.push(`Needs: ${persona.needs}`);
+    if (persona.painpoints)
+        parts.push(`Pain Points: ${persona.painpoints}`);
+    formatted.persona = parts.join('\n');
+    console.log('PersonaService: Formatted persona parameters:', formatted);
+    return formatted;
 }
 // File-based implementation functions (private)
 function getPersonasFromFiles() {

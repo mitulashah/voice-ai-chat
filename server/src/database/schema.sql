@@ -4,7 +4,7 @@
 -- Main documents table with JSON storage
 CREATE TABLE documents (
   id TEXT PRIMARY KEY,                              -- Unique identifier (filename without extension)
-  type TEXT NOT NULL CHECK (type IN ('persona', 'prompt_template')), -- Document type
+  type TEXT NOT NULL CHECK (type IN ('persona', 'prompt_template', 'scenario')), -- Document type
   name TEXT NOT NULL,                               -- Display name from document content
   document TEXT NOT NULL,                           -- Full JSON document content
   file_path TEXT NOT NULL,                          -- Source file path
@@ -39,3 +39,13 @@ CREATE INDEX idx_documents_type_name ON documents(type, name);
 -- FROM documents_fts
 -- WHERE documents_fts MATCH 'search_term'
 -- ORDER BY rank;
+
+-- Moods table for storing mood and description
+CREATE TABLE IF NOT EXISTS moods (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  mood TEXT NOT NULL UNIQUE,
+  description TEXT NOT NULL,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_moods_mood ON moods(mood);

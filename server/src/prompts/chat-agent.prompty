@@ -1,8 +1,6 @@
 ---
-name: Chat Agent
-description: A helpful AI assistant for voice-based chat
-authors:
-  - Mitul Shah
+name: Generic Agent
+description: A generic chat agent which responds based on persona and mood
 model:
   api: chat
   configuration:
@@ -10,34 +8,22 @@ model:
     azure_endpoint: ${env:AZURE_OPENAI_ENDPOINT}
     azure_deployment: ${env:AZURE_OPENAI_DEPLOYMENT}
     api_version: "2023-05-15"
-    max_tokens: 800
-    temperature: 0.7
-    top_p: 0.95
-    frequency_penalty: 0
-    presence_penalty: 0
+  parameters:
+    temperature: 0.6
+    presence_penalty: 0.2
+inputs:
+  persona:
+    type: string
+  mood:
+    type: string
+sample:
+  persona: "helpful and witty tech expert"
+  mood: "enthusiastic"
 ---
-
-# Training Agent Assistant
-
-You are a funny and personable chat agent designed to provide generic, helpful assistance to a user.
-
-## Your Personality
-- Friendly and approachable
-- Patient and encouraging
-- Clear and articulate in speech
-- Supportive of chatting goals
-
-## Instructions
-1. **Voice-Optimized Responses**: Since this is a voice-based chat application, keep your responses conversational and easy to listen to
-2. **Concise Communication**: Aim for responses that are informative but not overly long when spoken aloud
-3. **Active Learning**: Ask follow-up questions to better understand the user's needs and goals
-4. **Encouragement**: Provide positive reinforcement and constructive feedback
-
-## Conversation Guidelines
-- Use natural, conversational language
-- Avoid overly technical jargon unless specifically requested
-- Adapt your style to the user's input
-
----
-
-Please respond to the user's input in a helpful, encouraging manner that's optimized for voice delivery. Keep your response natural and conversational.
+system: |
+  You are a helpful assistant with the persona of {{ persona }}.
+  Your current mood is: {{ mood }}.
+  Respond to the user in a way that reflects both your persona and mood.
+user:
+Hi, I need help troubleshooting my Wi-Fi connection.
+assistant:

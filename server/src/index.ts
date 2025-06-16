@@ -11,6 +11,8 @@ import chatRouter from './routes/chat';
 import speechRouter from './routes/speech';
 import statsRouter from './routes/stats';
 import tokenRouter from './routes/token';
+import scenariosRouter from './routes/scenarios';
+import moodsRouter from './routes/moods';
 
 const app: Express = express();
 const PORT = config.port;
@@ -64,6 +66,8 @@ app.use('/api/chat', chatRouter);
 app.use('/api/speech', speechRouter);
 app.use('/api/speech/token', tokenRouter);
 app.use('/api/stats', statsRouter);
+app.use('/api/scenarios', scenariosRouter);
+app.use('/api/moods', moodsRouter);
 
 // Error handling middleware
 app.use(errorHandler);

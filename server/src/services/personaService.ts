@@ -77,6 +77,50 @@ export function getPersonasByAgeGroup(ageGroup: string, dbInstance?: any): Perso
   }
 }
 
+/**
+ * Format persona details for template substitution
+ */
+export function formatPersonaForTemplate(persona: Persona): Record<string, string> {
+  if (!persona) return {};
+
+  console.log('PersonaService: Formatting persona for template:', persona);
+
+  const formatted: Record<string, string> = {
+    persona_name: persona.name || '',
+    persona_id: persona.id || '',
+  };
+
+  // Add demographics as separate fields
+  if (persona.demographics) {
+    Object.entries(persona.demographics).forEach(([key, value]) => {
+      formatted[`persona_${key}`] = String(value || '');
+    });
+  }
+
+  // Add main persona characteristics
+  formatted.persona_behavior = persona.behavior || '';
+  formatted.persona_needs = persona.needs || '';
+  formatted.persona_painpoints = persona.painpoints || '';
+
+  // Also provide a combined persona description for templates that expect it
+  const parts = [];
+  if (persona.name) parts.push(`Name: ${persona.name}`);
+  if (persona.demographics) {
+    const demo = Object.entries(persona.demographics)
+      .map(([k, v]) => `${k}: ${v}`)
+      .join(', ');
+    if (demo) parts.push(`Demographics: ${demo}`);
+  }
+  if (persona.behavior) parts.push(`Behavior: ${persona.behavior}`);
+  if (persona.needs) parts.push(`Needs: ${persona.needs}`);
+  if (persona.painpoints) parts.push(`Pain Points: ${persona.painpoints}`);
+  
+  formatted.persona = parts.join('\n');
+  
+  console.log('PersonaService: Formatted persona parameters:', formatted);
+  return formatted;
+}
+
 // File-based implementation functions (private)
 function getPersonasFromFiles(): any[] {
   const personasDir = resolvePersonasDir();
