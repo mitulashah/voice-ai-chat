@@ -7,9 +7,9 @@ interface PersonaScenarioContextData {
   personas: Persona[];
   scenarios: Scenario[];
   selectedPersona: Persona | null;
-  setSelectedPersona: (persona: Persona) => void;
+  setSelectedPersona: (persona: Persona | null) => void;
   selectedScenario: Scenario | null;
-  setSelectedScenario: (scenario: Scenario) => void;
+  setSelectedScenario: (scenario: Scenario | null) => void;
   generatedName: GeneratedName | null;
   loading: boolean;
   error: string | null;

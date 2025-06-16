@@ -5,7 +5,7 @@ import type { Mood } from './mood-types';
 interface MoodContextData {
   moods: Mood[];
   selectedMood: Mood | null;
-  setSelectedMood: (mood: Mood) => void;
+  setSelectedMood: (mood: Mood | null) => void;
   loading: boolean;
   error: string | null;
 }

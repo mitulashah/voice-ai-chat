@@ -39,9 +39,9 @@ interface Message {
 const ChatInterface: React.FC = () => {
   const { currentTemplate } = useTemplate();
   const { messages, setMessages, totalTokens, setTotalTokens } = useChat();
-  const { selectedVoice } = useVoice();
-  const { selectedPersona, selectedScenario, generatedName } = usePersonaScenario();
-  const { selectedMood } = useMood();
+  const { selectedVoice, setSelectedVoice } = useVoice();
+  const { selectedPersona, selectedScenario, generatedName, setSelectedPersona, setSelectedScenario } = usePersonaScenario();
+  const { selectedMood, setSelectedMood } = useMood();
   
   const [exportJson, setExportJson] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -104,9 +104,7 @@ const ChatInterface: React.FC = () => {
         setTotalTokens(0);
         localStorage.removeItem('totalTokens');
       });
-  }, [selectedPersona, selectedScenario, selectedMood, selectedVoice, generatedName, currentTemplate, setMessages, setTotalTokens]);
-
-  // Track timestamps and end conversation
+  }, [selectedPersona, selectedScenario, selectedMood, selectedVoice, generatedName, currentTemplate, setMessages, setTotalTokens]);  // Track timestamps and end conversation
   const handleEndConversation = () => {
     if (messages.length === 0) return;
     const endTime = Date.now();
@@ -129,7 +127,14 @@ const ChatInterface: React.FC = () => {
     };
     const jsonString = JSON.stringify(exportData, null, 2);
     setExportJson(jsonString);
-    // Reset to only the initial system prompt and clear token count
+    
+    // Reset all context states
+    setSelectedPersona(null);
+    setSelectedScenario(null);
+    setSelectedMood(null);
+    setSelectedVoice(null);
+    
+    // Reset chat messages and token count
     if (currentTemplate) {
       setMessages([{ role: 'system', content: currentTemplate.prompt, timestamp: Date.now() }]);
       setTotalTokens(0);
@@ -139,7 +144,7 @@ const ChatInterface: React.FC = () => {
       setTotalTokens(0);
       localStorage.removeItem('totalTokens');
     }
-  };  // Clear chat but keep only the system prompt
+  };// Clear chat but keep only the system prompt
   const handleClearChat = () => {
     if (currentTemplate) {
       setMessages([{ role: 'system', content: currentTemplate.prompt, timestamp: Date.now() }]);
@@ -270,18 +275,43 @@ const ChatInterface: React.FC = () => {
   }, [messages]);
 
   // Track which system messages are expanded
-  const [expandedSystemIndexes, setExpandedSystemIndexes] = useState<Set<number>>(new Set());
-  // Render the expandable menu bar and chat header with Spectrum styling
+  const [expandedSystemIndexes, setExpandedSystemIndexes] = useState<Set<number>>(new Set());  // Render the expandable menu bar and chat header with Spectrum styling
   return (
-    <Container maxWidth="lg" sx={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', p: 2, bgcolor: theme.palette.background.default, flex: 1 }}>
-      <Paper elevation={0} sx={{ boxShadow: 'none', background: 'none', border: 'none', p: 0, width: '100%', height: '100%', display: 'flex', flexDirection: 'column', flex: 1 }}>
+    <Container 
+      maxWidth="lg" 
+      sx={{ 
+        height: '100vh', 
+        display: 'flex', 
+        flexDirection: 'column', 
+        alignItems: 'center', 
+        justifyContent: 'flex-start', 
+        p: 2, 
+        bgcolor: theme.palette.background.default,
+        overflow: 'hidden' // Prevent the main container from overflowing
+      }}
+    >
+      <Paper 
+        elevation={0} 
+        sx={{ 
+          boxShadow: 'none', 
+          background: 'none', 
+          border: 'none', 
+          p: 0, 
+          width: '100%', 
+          display: 'flex', 
+          flexDirection: 'column',
+          flex: 1,
+          minHeight: 0 // Allow flex shrinking
+        }}
+      >
         <MenuBar />
         <ChatHeader 
           avatarUrl={avatarUrl} 
           name={currentTemplate?.name && generatedName ? 
             `${currentTemplate.name} with ${generatedName.full}` : 
             currentTemplate?.name || 'Voice AI Chat'} 
-        />        <Paper
+        />
+        <Paper
           elevation={3}
           sx={{
             p: 3,
@@ -326,70 +356,71 @@ const ChatInterface: React.FC = () => {
               isListening={isListening}
               toggleListening={toggleListening}
             />
-          </Box>
-        </Paper>
-      </Paper>      {/* Button bar moved below chat window */}
-      <Box
-        sx={{
-          mt: 2,
-          mb: 4, // Increased from mb: 2 to mb: 4 for more space at bottom
-          display: 'flex',
-          flexDirection: 'row',
-          justifyContent: 'flex-end',
-          alignItems: 'center',
-          gap: 2,
-          width: '100%',
-        }}
-      >
-        <Button
-          variant="outlined"
-          color="inherit"
-          onClick={handleClearChat}
+          </Box>        </Paper>
+        
+        {/* Button bar - fixed at bottom of the main container */}
+        <Box
           sx={{
-            textTransform: 'none',
-            fontWeight: 600,
-            fontSize: '.9rem',
-            borderRadius: 2,
-            px: 3,
-            py: 1.5,
-            color: 'grey.700',
-            borderColor: 'grey.300',
-            transition: 'all 0.3s ease',
-            background: 'rgba(255,255,255,0.7)',
-            '&:hover': {
-              borderColor: theme.palette.primary.main,
-              backgroundColor: 'rgba(0, 102, 204, 0.04)',
-              color: theme.palette.primary.main,
-              transform: 'translateY(-2px)',
-              boxShadow: '0 4px 12px rgba(0, 102, 204, 0.15)',
-            },
+            mt: 2,
+            display: 'flex',
+            flexDirection: 'row',
+            justifyContent: 'flex-end',
+            alignItems: 'center',
+            gap: 2,
+            width: '100%',
+            flexShrink: 0, // Prevent buttons from shrinking
           }}
         >
-          Clear Chat
-        </Button>
-        <Button
-          variant="contained"
-          onClick={handleEndConversation}
-          sx={{
-            textTransform: 'none',
-            fontWeight: 600,
-            fontSize: '.9rem',
-            borderRadius: 2,
-            px: 3,
-            py: 1.5,
-            background: 'linear-gradient(135deg, #ff6b35 0%, #cc4a1a 100%)',
-            transition: 'all 0.3s ease',
-            boxShadow: '0 2px 8px rgba(255, 107, 53, 0.10)',
-            '&:hover': { 
-              background: 'linear-gradient(135deg, #cc4a1a 0%, #994d1f 100%)',
-              transform: 'translateY(-2px)',
-              boxShadow: '0 4px 12px rgba(255, 107, 53, 0.3)',
-            }
-          }}
-        >
-          Evaluate Conversation
-        </Button>
-      </Box>
+          <Button
+            variant="outlined"
+            color="inherit"
+            onClick={handleClearChat}
+            sx={{
+              textTransform: 'none',
+              fontWeight: 600,
+              fontSize: '.9rem',
+              borderRadius: 2,
+              px: 3,
+              py: 1.5,
+              color: 'grey.700',
+              borderColor: 'grey.300',
+              transition: 'all 0.3s ease',
+              background: 'rgba(255,255,255,0.7)',
+              '&:hover': {
+                borderColor: theme.palette.primary.main,
+                backgroundColor: 'rgba(0, 102, 204, 0.04)',
+                color: theme.palette.primary.main,
+                transform: 'translateY(-2px)',
+                boxShadow: '0 4px 12px rgba(0, 102, 204, 0.15)',
+              },
+            }}
+          >
+            Clear Chat
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleEndConversation}
+            sx={{
+              textTransform: 'none',
+              fontWeight: 600,
+              fontSize: '.9rem',
+              borderRadius: 2,
+              px: 3,
+              py: 1.5,
+              background: 'linear-gradient(135deg, #ff6b35 0%, #cc4a1a 100%)',
+              transition: 'all 0.3s ease',
+              boxShadow: '0 2px 8px rgba(255, 107, 53, 0.10)',
+              '&:hover': { 
+                background: 'linear-gradient(135deg, #cc4a1a 0%, #994d1f 100%)',
+                transform: 'translateY(-2px)',
+                boxShadow: '0 4px 12px rgba(255, 107, 53, 0.3)',
+              }
+            }}
+          >
+            Evaluate Conversation
+          </Button>
+        </Box>
+      </Paper>
       <Snackbar
         open={Boolean(errorMessage)}
         autoHideDuration={6000}
