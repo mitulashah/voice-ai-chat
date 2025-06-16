@@ -83,6 +83,8 @@ function synthesizeSpeechStream(text, voiceGender, res, voiceName) {
                 resolvedVoiceName = 'en-US-AndrewNeural';
             else if (voiceName === 'FableNeural')
                 resolvedVoiceName = 'en-US-FableNeural';
+            else if (voiceName === 'en-US-Alloy:DragonHDLatestNeural')
+                resolvedVoiceName = 'en-US-Alloy:DragonHDLatestNeural';
             else
                 resolvedVoiceName = voiceGender === 'male' ? 'en-US-AndrewNeural' : 'en-US-JennyNeural';
         }

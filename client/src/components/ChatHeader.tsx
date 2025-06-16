@@ -4,6 +4,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import MoodIcon from '@mui/icons-material/Mood';
 import TheatersIcon from '@mui/icons-material/Theaters';
 import DescriptionIcon from '@mui/icons-material/Description';
+import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import { useTemplate } from '../context/TemplateContext';
 import { usePersonaScenario } from '../context/PersonaScenarioContext';
 import { useMood } from '../context/MoodContext';
@@ -22,10 +23,9 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   avatarUrl,
 }) => {
   const [randomAvatarUrl, setRandomAvatarUrl] = useState<string>('');
-  const { currentTemplate } = useTemplate();
-  const { selectedPersona, selectedScenario, generatedName } = usePersonaScenario();
+  const { currentTemplate } = useTemplate();  const { selectedPersona, selectedScenario, generatedName } = usePersonaScenario();
   const { selectedMood } = useMood();
-  const { selectedVoice } = useVoice();
+  const { selectedVoice, getVoiceByValue } = useVoice();
   const theme = useTheme();
   
   // Create display name: Template Name with Generated Person Name
@@ -34,11 +34,18 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
     displayName = `${currentTemplate.name} with ${generatedName.full}`;
   }
 
-  // Determine which TTS voice will be used
+  // Determine which TTS voice will be used and get the display name
   let voiceName = selectedVoice;
+  let voiceDisplayName = selectedVoice;
+  
   if (!voiceName) {
+    // Fallback based on avatar gender
     voiceName = randomAvatarUrl.includes('/men/') ? 'AndrewNeural' : 'JennyNeural';
   }
+  
+  // Get the friendly display name from voice options
+  const voiceOption = getVoiceByValue(voiceName);
+  voiceDisplayName = voiceOption ? voiceOption.name : voiceName;
 
   // Compose chips for persona, mood, scenario, template, and voice
   const chips = [
@@ -105,17 +112,18 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           '& .MuiChip-icon': { color: theme.palette.success.main },
         }}
       />
-    ),
-    (
+    ),    (
       <Chip
         key="voice"
-        label={`Voice: ${voiceName}`}
+        icon={<VolumeUpIcon />}
+        label={`Voice: ${voiceDisplayName}`}
         variant="outlined"
         size="small"
         sx={{
           bgcolor: 'background.paper',
-          color: theme.palette.info.main,
-          borderColor: theme.palette.info.light,
+          color: '#E91E63', // Pink/magenta to match MenuBar voices color
+          borderColor: '#F8BBD9', // Light pink border
+          '& .MuiChip-icon': { color: '#E91E63' }, // Match icon color to text
         }}
       />
     ),

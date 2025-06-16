@@ -47,7 +47,6 @@ const sdk = __importStar(require("microsoft-cognitiveservices-speech-sdk"));
 const env_1 = require("../config/env");
 function generateSpeech(text, voiceGender, voiceName) {
     return __awaiter(this, void 0, void 0, function* () {
-        // Determine voice
         let resolvedVoiceName;
         if (voiceName) {
             // Map UI value to Azure full voice name
@@ -57,6 +56,8 @@ function generateSpeech(text, voiceGender, voiceName) {
                 resolvedVoiceName = 'en-US-AndrewNeural';
             else if (voiceName === 'FableNeural')
                 resolvedVoiceName = 'en-US-FableTurboMultilingualNeural';
+            else if (voiceName === 'en-US-Alloy:DragonHDLatestNeural')
+                resolvedVoiceName = 'en-US-Alloy:DragonHDLatestNeural';
             else
                 resolvedVoiceName = voiceGender === 'male' ? 'en-US-AndrewNeural' : 'en-US-JennyNeural';
         }

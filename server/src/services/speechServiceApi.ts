@@ -19,12 +19,12 @@ export async function synthesizeSpeech(text: string, voiceGender?: 'male' | 'fem
 export async function synthesizeSpeechStream(text: string, voiceGender: 'male' | 'female' | undefined, res: any, voiceName?: string) {
   if (!text) throw new Error('No text provided');
   // Record synthesized audio character count
-  statsService.recordAudioChars(text.length);
-  let resolvedVoiceName: string;
+  statsService.recordAudioChars(text.length);  let resolvedVoiceName: string;
   if (voiceName) {
     if (voiceName === 'JennyNeural') resolvedVoiceName = 'en-US-JennyNeural';
     else if (voiceName === 'AndrewNeural') resolvedVoiceName = 'en-US-AndrewNeural';
     else if (voiceName === 'FableNeural') resolvedVoiceName = 'en-US-FableNeural';
+    else if (voiceName === 'en-US-Alloy:DragonHDLatestNeural') resolvedVoiceName = 'en-US-Alloy:DragonHDLatestNeural';
     else resolvedVoiceName = voiceGender === 'male' ? 'en-US-AndrewNeural' : 'en-US-JennyNeural';
   } else {
     resolvedVoiceName = voiceGender === 'male' ? 'en-US-AndrewNeural' : 'en-US-JennyNeural';

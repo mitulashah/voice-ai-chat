@@ -16,10 +16,10 @@
   "exit_criteria": {
     "description": "The conversation should end when the customer (LLM) confirms the issue is resolved and expresses readiness to conclude.",
     "customer_exit_signals": [
-      "LLM confirms the Xumo box is now working",
-      "LLM expresses satisfaction or relief (e.g., 'It’s back on!', 'Finally working!')",
-      "LLM thanks the agent or begins to wrap up the conversation",
-      "LLM stops expressing concern or frustration"
+      "Customer confirms the Xumo box is now working",
+      "Customer expresses satisfaction or relief (e.g., 'It’s back on!', 'Finally working!')",
+      "Customer thanks the agent or begins to wrap up the conversation",
+      "Customer stops expressing concern or frustration"
     ]
   },
   "evaluation_criteria": {

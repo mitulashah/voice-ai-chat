@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Typography, Box, Button, Paper } from '@mui/material';
+import { Dialog, DialogTitle, DialogContent, DialogActions, Typography, Box, Button, Paper, IconButton, Tooltip, Snackbar, Alert } from '@mui/material';
+import { ContentCopy as ContentCopyIcon } from '@mui/icons-material';
 
 interface ExportDialogProps {
   exportJson: string | null;
@@ -9,6 +10,7 @@ interface ExportDialogProps {
 
 const ExportDialog: React.FC<ExportDialogProps> = ({ exportJson, onClose, onDownload }) => {
   const [stats, setStats] = useState<{ speechDurationSeconds: number; audioCharacterCount: number } | null>(null);
+  const [copySuccess, setCopySuccess] = useState(false);
     // Parse the export data to extract comprehensive information
   const exportData = exportJson ? JSON.parse(exportJson) : null;
   
@@ -24,10 +26,22 @@ const ExportDialog: React.FC<ExportDialogProps> = ({ exportJson, onClose, onDown
   const evaluationCriteria = exportData?.evaluationCriteria || {};
   
   // Show "No conversation" if no user messages were sent
-  const hasUserMessages = messageCount > 0;
-  const displayDuration = hasUserMessages 
+  const hasUserMessages = messageCount > 0;  const displayDuration = hasUserMessages 
     ? `${durationMinutes}:${durationSeconds.toString().padStart(2, '0')}`
     : '0:00';
+
+  // Copy to clipboard function
+  const handleCopyToClipboard = async () => {
+    if (!exportJson) return;
+    
+    try {
+      await navigator.clipboard.writeText(exportJson);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy to clipboard:', err);
+    }
+  };
 
   useEffect(() => {
     if (!exportJson) return;
@@ -43,15 +57,14 @@ const ExportDialog: React.FC<ExportDialogProps> = ({ exportJson, onClose, onDown
     fetchStats();
   }, [exportJson]);
 
-  return (
-    <Dialog
+  return (    <Dialog
       open={Boolean(exportJson)}
       onClose={onClose}
-      maxWidth="sm"
+      maxWidth="md"
       fullWidth
       disableRestoreFocus={false}
       disableEnforceFocus={false}
-    >      <DialogTitle sx={{ pb: 1, fontSize: '1.1rem' }}>
+    ><DialogTitle sx={{ pb: 1, fontSize: '1.1rem' }}>
         {exportData?.evaluationCriteria?.scenarioId 
           ? 'Scenario Evaluation Export' 
           : 'Export Conversation'
@@ -61,11 +74,10 @@ const ExportDialog: React.FC<ExportDialogProps> = ({ exportJson, onClose, onDown
         
         {/* Context Information - Only show if comprehensive data is available */}
         {exportData?.context && (
-          <Paper elevation={1} sx={{ p: 1.5, mb: 1.5, bgcolor: '#e8f5e8' }}>
-            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, fontSize: '0.875rem' }}>
+          <Paper elevation={1} sx={{ p: 1.5, mb: 1.5, bgcolor: '#e8f5e8' }}>            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, fontSize: '0.875rem' }}>
               Evaluation Context
             </Typography>
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, fontSize: '0.75rem' }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 1, fontSize: '0.75rem' }}>
               {context.persona && (
                 <Box>
                   <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary' }}>
@@ -221,8 +233,7 @@ const ExportDialog: React.FC<ExportDialogProps> = ({ exportJson, onClose, onDown
                 )}
               </Box>
             )}
-            
-            <Box component="div" sx={{ pl: 0 }}>
+              <Box component="div" sx={{ pl: 0 }}>
               {evaluationCriteria.suggestedEvaluationAreas.map((area: string, index: number) => (
                 <Typography 
                   key={index} 
@@ -231,8 +242,7 @@ const ExportDialog: React.FC<ExportDialogProps> = ({ exportJson, onClose, onDown
                     fontSize: '0.75rem', 
                     mb: 0.5,
                     fontWeight: area.includes(':') ? 600 : 400,
-                    color: area.startsWith('  •') ? 'text.secondary' : 'text.primary',
-                    fontFamily: area.startsWith('  •') ? 'monospace' : 'inherit'
+                    color: area.startsWith('  •') ? 'text.secondary' : 'text.primary'
                   }}
                 >
                   {area}
@@ -240,24 +250,40 @@ const ExportDialog: React.FC<ExportDialogProps> = ({ exportJson, onClose, onDown
               ))}
             </Box>
           </Paper>
-        )}
-
-        {/* JSON Export */}
-        <Box 
-          component="pre" 
-          sx={{ 
-            bgcolor: '#f5f5f5', 
-            p: 1, 
-            borderRadius: 1, 
-            maxHeight: 180, 
-            overflow: 'auto',
-            fontSize: '0.7rem',
-            fontFamily: 'monospace',
-            mb: 1.5,
-            border: '1px solid #e0e0e0'
-          }}
-        >
-          {exportJson}
+        )}        {/* JSON Export */}
+        <Box sx={{ position: 'relative', mb: 1.5 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: '0.875rem' }}>
+              JSON Export
+            </Typography>
+            <Tooltip title={copySuccess ? "Copied!" : "Copy to clipboard"}>
+              <IconButton
+                onClick={handleCopyToClipboard}
+                size="small"
+                sx={{ 
+                  color: copySuccess ? 'success.main' : 'text.secondary',
+                  '&:hover': { color: 'primary.main' }
+                }}
+              >
+                <ContentCopyIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+          <Box 
+            component="pre" 
+            sx={{ 
+              bgcolor: '#f5f5f5', 
+              p: 1, 
+              borderRadius: 1, 
+              maxHeight: 180, 
+              overflow: 'auto',
+              fontSize: '0.7rem',
+              fontFamily: 'monospace',
+              border: '1px solid #e0e0e0'
+            }}
+          >
+            {exportJson}
+          </Box>
         </Box>
         
         <Button
@@ -270,11 +296,22 @@ const ExportDialog: React.FC<ExportDialogProps> = ({ exportJson, onClose, onDown
           Download JSON
         </Button>
       </DialogContent>
-      <DialogActions sx={{ pt: 0, pb: 1 }}>
-        <Button onClick={onClose} size="small">
+      <DialogActions sx={{ pt: 0, pb: 1 }}>        <Button onClick={onClose} size="small">
           Close
         </Button>
       </DialogActions>
+      
+      {/* Copy success feedback */}
+      <Snackbar
+        open={copySuccess}
+        autoHideDuration={2000}
+        onClose={() => setCopySuccess(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity="success" variant="filled" sx={{ fontSize: '0.875rem' }}>
+          JSON copied to clipboard!
+        </Alert>
+      </Snackbar>
     </Dialog>
   );
 };

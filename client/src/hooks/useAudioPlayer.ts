@@ -20,12 +20,10 @@ export const useAudioPlayer = (): AudioPlayerState => {
         audioRef.current = null;
       }
       setIsPlaying(true);
-      setCurrentPlayingId(id);
-
-      // Determine if voice is a known name or gender
+      setCurrentPlayingId(id);      // Determine if voice is a known name or gender
       let voiceGender: string | undefined;
       let voiceName: string | undefined;
-      if (voice === 'JennyNeural' || voice === 'AndrewNeural' || voice === 'FableNeural') {
+      if (voice === 'JennyNeural' || voice === 'AndrewNeural' || voice === 'FableNeural' || voice === 'en-US-Alloy:DragonHDLatestNeural') {
         voiceName = voice;
       } else if (voice === 'male' || voice === 'female') {
         voiceGender = voice;
