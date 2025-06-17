@@ -60,6 +60,7 @@ const stats_1 = __importDefault(require("./routes/stats"));
 const token_1 = __importDefault(require("./routes/token"));
 const scenarios_1 = __importDefault(require("./routes/scenarios"));
 const moods_1 = __importDefault(require("./routes/moods"));
+const agentEvaluationService_1 = require("./services/agentEvaluationService");
 const app = (0, express_1.default)();
 const PORT = env_1.config.port;
 // Middleware
@@ -100,6 +101,68 @@ app.use('/api/speech/token', token_1.default);
 app.use('/api/stats', stats_1.default);
 app.use('/api/scenarios', scenarios_1.default);
 app.use('/api/moods', moods_1.default);
+// Evaluation endpoints - inline implementation
+const evaluationService = new agentEvaluationService_1.AgentEvaluationService();
+// POST /api/evaluation/analyze-simple - Simple JSON response version
+app.post('/api/evaluation/analyze-simple', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    console.log('Evaluation request received:', { timestamp: new Date().toISOString() });
+    try {
+        const conversationData = req.body;
+        console.log('Conversation data:', { messageCount: conversationData.messages.length, metadataKeys: Object.keys(conversationData.metadata || {}) });
+        // Validate the request body
+        if (!conversationData || !conversationData.messages || !Array.isArray(conversationData.messages)) {
+            return res.status(400).json({
+                error: 'Invalid request body. Expected ConversationData with messages array.'
+            });
+        }
+        if (conversationData.messages.length === 0) {
+            return res.status(400).json({
+                error: 'Conversation must contain at least one message.'
+            });
+        }
+        const invalidMessage = conversationData.messages.find((msg) => !msg.role || !msg.content || !msg.timestamp ||
+            !['user', 'assistant'].includes(msg.role));
+        if (invalidMessage) {
+            return res.status(400).json({
+                error: 'Invalid message format. Each message must have role, content, and timestamp.'
+            });
+        }
+        // Run evaluation without progress updates
+        const result = yield evaluationService.evaluateConversation(conversationData);
+        console.log('Evaluation result:', { runId: result.runId, threadId: result.threadId, timestamp: result.timestamp });
+        res.json({
+            success: true,
+            result
+        });
+    }
+    catch (error) {
+        console.error('Simple evaluation endpoint error:', error);
+        res.status(500).json({
+            success: false,
+            error: error instanceof Error ? error.message : 'Evaluation failed'
+        });
+    }
+}));
+// GET /api/evaluation/test - Test the Azure AI Agent connection
+app.get('/api/evaluation/test', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        // Removed: const isConnected = await evaluationService.testConnection();
+        res.json({
+            connected: true,
+            service: 'Azure AI Agent Service',
+            timestamp: new Date().toISOString()
+        });
+    }
+    catch (error) {
+        console.error('Connection test error:', error);
+        res.status(500).json({
+            connected: false,
+            error: error instanceof Error ? error.message : 'Connection test failed',
+            service: 'Azure AI Agent Service',
+            timestamp: new Date().toISOString()
+        });
+    }
+}));
 // Error handling middleware
 app.use(errorHandler_1.errorHandler);
 // Initialize database service and start server

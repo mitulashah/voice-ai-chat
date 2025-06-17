@@ -161,6 +161,13 @@ button:focus-visible {
   box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.3);
 }
 
+/* Remove focus ring on AccordionSummary buttons */
+.MuiButtonBase-root.MuiAccordionSummary-root:focus,
+.MuiButtonBase-root.MuiAccordionSummary-root:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
 /* Light theme overrides */
 @media (prefers-color-scheme: light) {
   :root {

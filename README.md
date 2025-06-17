@@ -7,6 +7,7 @@ A voice-based chat application that uses Azure OpenAI's Chat API and Azure Speec
 - Voice-to-text input using Azure Speech Recognition with custom audio processing
 - Text-to-speech responses via Azure Cognitive Services Speech SDK
 - Real-time chat interface with message history and AI avatars
+- **AI Conversation Evaluation** using Azure AI Agent Service for analyzing chat quality
 - **Prompty template integration** for structured prompt management
 - Supports multiple personas and prompt templates (easily extendable)
 - Built with React 19, TypeScript, and Material-UI (MUI) v7 on the frontend
@@ -23,6 +24,7 @@ A voice-based chat application that uses Azure OpenAI's Chat API and Azure Speec
 - npm (v8 or higher) or yarn
 - Azure OpenAI service with a deployed model
 - Azure Speech Services for speech recognition and synthesis
+- (Optional) Azure AI Hub/Project for conversation evaluation features
 
 ## Setup
 
@@ -46,7 +48,12 @@ A voice-based chat application that uses Azure OpenAI's Chat API and Azure Speec
    AZURE_OPENAI_DEPLOYMENT=your-deployment-name
    AZURE_SPEECH_KEY=your-azure-speech-service-key
    AZURE_SPEECH_REGION=your-azure-speech-service-region
+   
+   # Azure AI Agent Service (for conversation evaluation)
+   AZURE_AI_PROJECT_CONNECTION_STRING=region.api.azureml.ms;subscription-id;resource-group;workspace-name
    ```
+
+   See the [Azure AI Agent Service Configuration](#azure-ai-agent-service-configuration) section below for detailed setup instructions.
 
 4. Start the development server:
    ```powershell
@@ -117,6 +124,172 @@ PROMPTY_TEMPLATE=your-template-name
 
 For more details, see the [Prompts README](server/src/prompts/README.md).
 
+## Azure AI Agent Service Configuration
+
+The application includes an AI conversation evaluation feature powered by Azure AI Agent Service. This feature analyzes your chat conversations and provides detailed feedback on conversation quality, effectiveness, and areas for improvement.
+
+### Prerequisites
+
+- Azure subscription with access to Azure AI Studio
+- Azure AI Hub and Project set up in Azure AI Studio
+- Appropriate permissions to create service principals or use managed identities
+
+### Development Setup (Azure CLI Authentication)
+
+This is the easiest method for local development:
+
+1. **Install Azure CLI** if you haven't already:
+   ```powershell
+   winget install Microsoft.AzureCLI
+   ```
+
+2. **Login to Azure**:
+   ```powershell
+   az login
+   ```
+
+3. **Get your Project Connection String**:
+   - Go to [Azure AI Studio](https://ai.azure.com)
+   - Navigate to your project
+   - Go to **Settings** > **Connection details**
+   - Copy the connection string (format: `region.api.azureml.ms;subscription-id;resource-group;workspace-name`)
+
+4. **Add to your `.env` file**:
+   ```env
+   AZURE_AI_PROJECT_CONNECTION_STRING=your-connection-string-here
+   ```
+
+5. **Test the setup**:
+   ```powershell
+   # From the server directory
+   curl http://localhost:5000/api/evaluation/test
+   ```
+
+### Production Setup
+
+For production deployments, you have two main options:
+
+#### Option 1: Service Principal (Recommended for traditional deployments)
+
+1. **Create a Service Principal**:
+   ```powershell
+   # Create the service principal
+   az ad sp create-for-rbac --name "voice-ai-chat-eval-service" --role "Cognitive Services User" --scopes /subscriptions/YOUR_SUBSCRIPTION_ID
+   ```
+
+2. **Grant additional permissions**:
+   - Go to your Azure AI Hub in the Azure Portal
+   - Navigate to **Access control (IAM)** > **Add role assignment**
+   - Role: **Cognitive Services User** or **Contributor**
+   - Assign to your service principal
+
+3. **Set environment variables in production**:
+   ```env
+   AZURE_TENANT_ID=your-tenant-id
+   AZURE_CLIENT_ID=your-service-principal-client-id
+   AZURE_CLIENT_SECRET=your-service-principal-secret
+   AZURE_AI_PROJECT_CONNECTION_STRING=your-connection-string
+   ```
+
+#### Option 2: Managed Identity (Recommended for Azure deployments)
+
+If deploying to Azure App Service, Container Apps, Functions, etc.:
+
+1. **Enable Managed Identity** on your Azure resource:
+   - In Azure Portal, go to your App Service/Container App
+   - Navigate to **Identity** > **System assigned**
+   - Turn on the status and save
+
+2. **Grant permissions to your AI Hub**:
+   - Go to your Azure AI Hub in the Azure Portal
+   - Navigate to **Access control (IAM)** > **Add role assignment**
+   - Role: **Cognitive Services User** or **Contributor**
+   - Assign to your managed identity
+
+3. **Set only the connection string**:
+   ```env
+   AZURE_AI_PROJECT_CONNECTION_STRING=your-connection-string
+   ```
+
+### Configuration Options
+
+The following environment variables are supported:
+
+```env
+# Required: Project connection string
+AZURE_AI_PROJECT_CONNECTION_STRING=region.api.azureml.ms;subscription-id;resource-group;workspace-name
+
+# Alternative: Project endpoint URL (use instead of connection string)
+# AZURE_AI_FOUNDRY_PROJECT_ENDPOINT=https://your-project-name.region.api.azureml.ms
+
+# Optional: Specific evaluation agent ID
+# AZURE_EVALUATION_AGENT_ID=your-custom-agent-id
+
+# Production: Service Principal credentials (if not using managed identity)
+# AZURE_TENANT_ID=your-tenant-id
+# AZURE_CLIENT_ID=your-service-principal-client-id  
+# AZURE_CLIENT_SECRET=your-service-principal-secret
+```
+
+### Authentication Priority
+
+The application uses `DefaultAzureCredential`, which attempts authentication in this order:
+
+1. **Environment variables** (Service Principal)
+2. **Managed Identity** (if running on Azure)
+3. **Visual Studio** authentication
+4. **Azure CLI** authentication (`az login`)
+5. **Azure PowerShell** authentication
+6. **Interactive browser** (fallback)
+
+### Testing the Setup
+
+1. **Test API endpoint**:
+   ```powershell
+   # From your server directory
+   curl http://localhost:5000/api/evaluation/test
+   ```
+
+2. **Test evaluation with sample data**:
+   ```powershell
+   curl -X POST http://localhost:5000/api/evaluation/analyze-simple `
+        -H "Content-Type: application/json" `
+        -d '{"messages":[{"role":"user","content":"Hello"},{"role":"assistant","content":"Hi there!"}]}'
+   ```
+
+### Troubleshooting
+
+**Authentication Issues:**
+- Verify your Azure credentials with `az account show`
+- Check that your service principal has the correct permissions
+- Ensure the connection string format is correct
+
+**Permission Issues:**
+- Verify your account/service principal has access to the AI Hub
+- Check that the **Cognitive Services User** role is assigned
+- Ensure the AI Hub and project exist and are accessible
+
+**Configuration Issues:**
+- Validate the connection string format matches: `region.api.azureml.ms;subscription-id;resource-group;workspace-name`
+- Check that all required environment variables are set
+- Verify the Azure AI project is properly configured in Azure AI Studio
+
+### Using the Evaluation Feature
+
+Once configured, the evaluation feature is available in the UI:
+
+1. Have a conversation with the AI
+2. Click the **Export** button in the chat interface
+3. In the export dialog, click **AI Evaluation**
+4. Wait for the analysis to complete
+5. View the detailed Markdown report with conversation insights
+
+The evaluation provides analysis on:
+- Conversation quality and flow
+- Response appropriateness and helpfulness
+- Areas for improvement
+- Overall effectiveness metrics
+
 ## Environment Variables
 
 ### Backend
@@ -129,6 +302,21 @@ For more details, see the [Prompts README](server/src/prompts/README.md).
 - `AZURE_SPEECH_KEY`: Your Azure Speech Services API key
 - `AZURE_SPEECH_REGION`: Your Azure Speech Services region
 - `PROMPTY_TEMPLATE`: The Prompty template to use
+
+#### Azure AI Agent Service (Optional - for evaluation features)
+
+- `AZURE_AI_PROJECT_CONNECTION_STRING`: Connection string for your Azure AI project
+- `AZURE_AI_FOUNDRY_PROJECT_ENDPOINT`: Alternative to connection string
+- `AZURE_EVALUATION_AGENT_ID`: Specific evaluation agent ID (optional)
+
+#### Production Authentication (choose one method)
+
+**Service Principal:**
+- `AZURE_TENANT_ID`: Azure AD tenant ID
+- `AZURE_CLIENT_ID`: Service principal client ID
+- `AZURE_CLIENT_SECRET`: Service principal secret
+
+**Managed Identity:** (No additional variables needed - automatically detected)
 
 ## Dependencies (2025)
 
@@ -148,6 +336,8 @@ For more details, see the [Prompts README](server/src/prompts/README.md).
 - typescript@5.8.3
 - ts-node@10.9.2
 - @azure/openai@2.0.0
+- @azure/ai-projects@1.0.0-beta.2
+- @azure/identity@4.5.0
 - axios@1.10.0
 - chokidar@4.0.3
 - cors@2.8.5

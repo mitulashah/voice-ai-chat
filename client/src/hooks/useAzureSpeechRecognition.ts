@@ -56,15 +56,26 @@ export const useAzureSpeechRecognition = (onTranscript: (text: string) => void):
         setError('Speech token or region is missing.');
         return;
       }
+      
       const speechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(
         speechToken,
         speechRegion
       );
-      speechConfig.speechRecognitionLanguage = 'en-US';
+      speechConfig.speechRecognitionLanguage = 'en-US';        // Optimized audio configuration for natural speech with good responsiveness
+      speechConfig.setProperty(SpeechSDK.PropertyId.SpeechServiceConnection_InitialSilenceTimeoutMs, "5000");
+      speechConfig.setProperty(SpeechSDK.PropertyId.SpeechServiceConnection_EndSilenceTimeoutMs, "600");
+      speechConfig.setProperty(SpeechSDK.PropertyId.Speech_SegmentationSilenceTimeoutMs, "600");
+      
+      // Enable detailed logging and profanity filtering
+      speechConfig.enableDictation();
+      speechConfig.setProperty(SpeechSDK.PropertyId.SpeechServiceResponse_RequestDetailedResultTrueFalse, "true");
+      
       // Use the default microphone
       const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
+      
       const recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
       recognizerRef.current = recognizer;
+      
       setIsListening(true);
       // Mark session start
       sessionStartTime.current = Date.now();
@@ -77,6 +88,9 @@ export const useAzureSpeechRecognition = (onTranscript: (text: string) => void):
         if (e.result.reason === SpeechSDK.ResultReason.RecognizedSpeech && e.result.text) {
           onTranscript(e.result.text);
         }
+      };
+      recognizer.sessionStarted = () => {
+        // Session started
       };
       recognizer.sessionStopped = () => {
         setIsListening(false);
@@ -95,11 +109,19 @@ export const useAzureSpeechRecognition = (onTranscript: (text: string) => void):
         }
         cleanup();
       };
+      recognizer.speechStartDetected = () => {
+        // Speech start detected
+      };
+      recognizer.speechEndDetected = () => {
+        // Speech end detected
+      };
       recognizer.canceled = (_s, e) => {
         setError(`Recognition canceled: ${e.errorDetails || e.reason}`);
         cleanup();
       };
+      
       recognizer.startContinuousRecognitionAsync();
+      
       // Timeout removed: recognition will continue until user stops it
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start recognition');

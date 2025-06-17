@@ -19,6 +19,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@azure/ai-projects": "^1.0.0-beta.8",
+    "@azure/identity": "^4.10.1",
     "@azure/openai": "^2.0.0",
     "axios": "^1.10.0",
     "chokidar": "^4.0.3",

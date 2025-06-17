@@ -7,10 +7,18 @@ const router = Router();
 router.post('/recognize', async (req: Request, res: Response) => {
   try {
     const { audioData } = req.body;
+    console.log('Speech recognition request received, audioData length:', audioData?.length || 'undefined');
     const result = await recognizeSpeech(audioData);
+    console.log('Speech recognition successful:', result);
     res.json({ text: result });
   } catch (error) {
-    res.status(500).json({ error: 'Speech recognition failed' });
+    console.error('Speech recognition failed:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ 
+      error: 'Speech recognition failed',
+      details: errorMessage,
+      type: error instanceof Error ? error.constructor.name : 'Unknown'
+    });
   }
 });
 

@@ -104,8 +104,7 @@ const ChatInterface: React.FC = () => {
         }
         setTotalTokens(0);
         localStorage.removeItem('totalTokens');
-      });
-  }, [selectedPersona, selectedScenario, selectedMood, selectedVoice, generatedName, currentTemplate, setMessages, setTotalTokens]);  // Track timestamps and end conversation
+      });  }, [selectedPersona, selectedScenario, selectedMood, selectedVoice, generatedName, currentTemplate, setMessages, setTotalTokens]);  // Track timestamps and end conversation
   const handleEndConversation = async () => {
     if (messages.length === 0) return;
     const endTime = Date.now();
