@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Dialog, DialogTitle, DialogContent } from '@mui/material';
 import { useEvaluation } from '../context/EvaluationContext';
-import html2pdf from 'html2pdf.js';
 import { copyToClipboard, buildConversationData, formatDuration } from '../utils/exportDialogUtils';
 import { useCopySnackbar } from '../hooks/useCopySnackbar';
 import { parseExportData } from '../utils/exportDataParser';
@@ -14,6 +13,8 @@ import ExportDialogJsonTranscript from './ExportDialogJsonTranscript';
 import ExportDialogEvaluationResults from './ExportDialogEvaluationResults';
 import ExportDialogActions from './ExportDialogActions';
 import ExportDialogSnackbar from './ExportDialogSnackbar';
+import jsPDF from 'jspdf';
+import { marked } from 'marked';
 
 interface ExportDialogProps {
   exportJson: string | null;
@@ -78,6 +79,8 @@ const ExportDialog: React.FC<ExportDialogProps> = ({ exportJson, onClose, onDown
   // Handle AI evaluation
   const handleAIEvaluation = async () => {
     if (!exportData) return;
+    // Collapse all except evaluation before starting
+    setPanels(['evaluation']);
     const conversationData = buildConversationData(exportData);
     if (!conversationData) return;
     await evaluateConversation(conversationData);
@@ -100,14 +103,22 @@ const ExportDialog: React.FC<ExportDialogProps> = ({ exportJson, onClose, onDown
   // Ref for the markdown section
   const evaluationPdfRef = useRef<HTMLDivElement>(null!);
 
-  // PDF download handler
-  const handleDownloadEvaluationPdf = () => {
-    if (evaluationPdfRef.current) {
-      html2pdf()
-        .from(evaluationPdfRef.current)
-        .set({ filename: 'evaluation-summary.pdf', margin: 0.5, html2canvas: { scale: 2 } })
-        .save();
-    }
+  // PDF download handler (markdown to PDF)
+  const handleDownloadEvaluationPdf = async () => {
+    if (!markdownText) return;
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const html = await marked.parse(markdownText) as string;
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    doc.html(container, {
+      callback: function (doc) {
+        doc.save('evaluation-summary.pdf');
+      },
+      x: 32,
+      y: 32,
+      width: 530, // fit to A4
+      windowWidth: 800,
+    });
   };
 
   return (
@@ -162,6 +173,7 @@ const ExportDialog: React.FC<ExportDialogProps> = ({ exportJson, onClose, onDown
           lastEvaluation={lastEvaluation}
           evaluationPdfRef={evaluationPdfRef}
           markdownText={markdownText}
+          isEvaluating={isEvaluating}
         />
 
       </DialogContent>

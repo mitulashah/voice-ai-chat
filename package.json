@@ -16,6 +16,8 @@
     "@mui/icons-material": "^7.1.1",
     "@mui/material": "^7.1.1",
     "html2pdf.js": "^0.10.3",
+    "jspdf": "^3.0.1",
+    "marked": "^15.0.12",
     "react-router-dom": "^7.6.2"
   }
 }
