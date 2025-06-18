@@ -16,6 +16,8 @@ import ExportDialogSnackbar from './ExportDialogSnackbar';
 import jsPDF from 'jspdf';
 import { marked } from 'marked';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
 interface ExportDialogProps {
   exportJson: string | null;
   onClose: () => void;
@@ -90,7 +92,7 @@ const ExportDialog: React.FC<ExportDialogProps> = ({ exportJson, onClose, onDown
     if (!exportJson) return;
     const fetchStats = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/stats');
+        const res = await fetch(`${API_BASE_URL}/api/stats`);
         const data = await res.json();
         setStats({ speechDurationSeconds: data.speechDurationSeconds, audioCharacterCount: data.audioCharacterCount });
       } catch (e) {

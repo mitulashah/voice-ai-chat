@@ -55,3 +55,11 @@ server/data/*
 # Temp folders
 server/src/temp/
 server/dist/temp/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+terraform.tfvars
+.terraform.lock.hcl

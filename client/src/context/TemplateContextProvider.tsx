@@ -3,6 +3,8 @@ import axios from 'axios';
 import type { Template } from './template-types';
 import { TemplateContext } from './template-context';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL;
+
 interface TemplateProviderProps {
   children: React.ReactNode;
 }
@@ -12,7 +14,7 @@ const TemplateProvider: React.FC<TemplateProviderProps> = ({ children }) => {
   const [currentTemplate, setCurrentTemplate] = useState<Template | null>(null);
 
   useEffect(() => {
-    axios.get<{ success: boolean; templates: Template[]; count: number }>('/api/templates')
+    axios.get<{ success: boolean; templates: Template[]; count: number }>(`${API_BASE_URL}/api/templates`)
       .then(res => setTemplates(res.data.templates || []))
       .catch(err => console.error('Failed to load templates:', err));
   }, []);

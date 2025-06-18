@@ -23,6 +23,8 @@ interface DiagnosticResult {
   details?: any;
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
 const SpeechDiagnostics: React.FC = () => {
   const [results, setResults] = useState<DiagnosticResult[]>([]);
   const [isRunning, setIsRunning] = useState(false);
@@ -44,7 +46,7 @@ const SpeechDiagnostics: React.FC = () => {
     // Test 1: Check if server is reachable
     addResult({ test: 'Server Health Check', status: 'pending', message: 'Checking server connection...' });
     try {
-      const response = await fetch('http://localhost:5000/api/health');
+      const response = await fetch(`${API_BASE_URL}/api/health`);
       const data = await response.json();
       updateResult('Server Health Check', {
         status: 'success',
@@ -201,7 +203,7 @@ const SpeechDiagnostics: React.FC = () => {
     addResult({ test: 'Speech Recognition Endpoint', status: 'pending', message: 'Testing speech recognition endpoint...' });
     try {
       // Send empty audio data to test the endpoint structure (should fail gracefully)
-      const response = await fetch('http://localhost:5000/api/speech/recognize', {
+      const response = await fetch(`${API_BASE_URL}/api/speech/recognize`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ audioData: '' })

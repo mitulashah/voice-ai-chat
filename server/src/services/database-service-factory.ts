@@ -54,9 +54,15 @@ export class DatabaseServiceFactory {
 
   private async _initializeDatabase(): Promise<void> {
     try {
-      console.log('🔧 Initializing database service...');      if (this.config.useDatabaseByDefault) {
+      console.log('🔧 Initializing database service...');
+      const dbPath = this.config.dbPath || path.join(process.cwd(), 'data', 'voice-ai-documents.db');
+      // Ensure the data directory exists before initializing the database
+      const dataDir = path.dirname(dbPath);
+      if (!fs.existsSync(dataDir)) {
+        fs.mkdirSync(dataDir, { recursive: true });
+      }
+      if (this.config.useDatabaseByDefault) {
         // Production: Use FileSyncDatabase for live file watching
-        const dbPath = this.config.dbPath || path.join(process.cwd(), 'data', 'voice-ai-documents.db');
         this.database = new FileSyncDatabase(dbPath, {
           personasDir: this.config.personasDir,
           templatesDir: this.config.templatesDir,
@@ -69,7 +75,6 @@ export class DatabaseServiceFactory {
         console.log('📊 Using FileSyncDatabase (production mode)');
       } else {
         // Development: Use FileSyncDatabase for hot reloading
-        const dbPath = this.config.dbPath || path.join(process.cwd(), 'data', 'voice-ai-documents.db');
         this.database = new FileSyncDatabase(dbPath, {
           personasDir: this.config.personasDir,
           templatesDir: this.config.templatesDir,

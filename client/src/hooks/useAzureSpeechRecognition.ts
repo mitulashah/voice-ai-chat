@@ -9,6 +9,8 @@ interface SpeechRecognitionState {
   stopListening: () => void;
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
 export const useAzureSpeechRecognition = (onTranscript: (text: string) => void): SpeechRecognitionState => {
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -100,7 +102,7 @@ export const useAzureSpeechRecognition = (onTranscript: (text: string) => void):
         if (sessionStartTime.current && sessionEndTime.current) {
           const durationMs = sessionEndTime.current - sessionStartTime.current;
           if (durationMs > 0) {
-            fetch('http://localhost:5000/api/stats/speech-duration', {
+            fetch(`${API_BASE_URL}/api/stats/speech-duration`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ seconds: durationMs / 1000 })

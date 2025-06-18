@@ -7,6 +7,8 @@ import type {
   ConnectionStatus
 } from './evaluation-types';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
 interface EvaluationContextType {
   // State
   isEvaluating: boolean;
@@ -61,7 +63,7 @@ export const EvaluationProvider: React.FC<EvaluationProviderProps> = ({ children
         percentage: 25
       });
 
-      const response = await fetch('/api/evaluation/analyze-simple', {
+      const response = await fetch(`${API_BASE_URL}/api/evaluation/analyze-simple`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -121,7 +123,7 @@ export const EvaluationProvider: React.FC<EvaluationProviderProps> = ({ children
 
   const testConnection = useCallback(async (): Promise<boolean> => {
     try {
-      const response = await fetch('/api/evaluation/test');
+      const response = await fetch(`${API_BASE_URL}/api/evaluation/test`);
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

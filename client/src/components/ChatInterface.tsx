@@ -37,6 +37,8 @@ interface Message {
   };
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
 const ChatInterface: React.FC = () => {
   const { currentTemplate } = useTemplate();
   const { messages, setMessages, totalTokens, setTotalTokens } = useChat();
@@ -116,7 +118,7 @@ const ChatInterface: React.FC = () => {
       // Fetch server-side stats for comprehensive data
     let serverStats = null;
     try {
-      const response = await fetch('http://localhost:5000/api/stats');
+      const response = await fetch(`${API_BASE_URL}/api/stats`);
       serverStats = await response.json();
     } catch (error) {
       console.error('Failed to fetch server stats:', error);
@@ -127,7 +129,7 @@ const ChatInterface: React.FC = () => {
     let evaluationAreas: string[] = [];
     if (selectedScenario?.id) {
       try {
-        const response = await fetch(`http://localhost:5000/api/scenarios/${selectedScenario.id}`);
+        const response = await fetch(`${API_BASE_URL}/api/scenarios/${selectedScenario.id}`);
         const data = await response.json();
         if (data.success && data.scenario) {
           scenarioDetails = data.scenario;
@@ -323,7 +325,7 @@ const ChatInterface: React.FC = () => {
 
     try {
       const response = await executeWithRetry(
-        () => axios.post('http://localhost:5000/api/chat', {
+        () => axios.post(`${API_BASE_URL}/api/chat`, {
           // Send the full messages thread for context
           messages: updatedMessages.map(({ role, content }) => ({ role, content })),
           parameters,
@@ -583,7 +585,7 @@ const ChatInterface: React.FC = () => {
         onClose={async () => {
           setExportJson(null);
           try {
-            await fetch('http://localhost:5000/api/stats/reset', { method: 'POST' });
+            await fetch(`${API_BASE_URL}/api/stats/reset`, { method: 'POST' });
           } catch (e) {
             // Optionally handle error
             console.error('Failed to reset stats:', e);
