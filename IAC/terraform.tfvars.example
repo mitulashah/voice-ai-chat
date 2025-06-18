@@ -1,0 +1,21 @@
+# Sample environment variables file
+# Copy this to .env and update with your actual values
+
+# Development Environment Configuration
+project_name = "voice-ai-chat"
+environment  = "dev"
+location     = "East US"
+static_web_app_location = "East US 2"
+
+# Resource SKUs (optimized for development)
+cognitive_services_sku = "F0"
+database_sku          = "Basic"
+app_service_sku       = "F1"
+static_web_app_sku    = "Free"
+
+# Database Configuration
+sql_admin_login    = "sqladmin"
+# sql_admin_password = "YourSecurePassword123!"
+
+# Note: For security, set the password via environment variable:
+# $env:TF_VAR_sql_admin_password = "YourSecurePassword123!"

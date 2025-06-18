@@ -1,12 +1,25 @@
-# Node dependencies
+# =============================================================================
+# Voice AI Chat Project - Comprehensive .gitignore
+# Consolidated from all project .gitignore files
+# =============================================================================
+
+# =============================================================================
+# Node.js & NPM
+# =============================================================================
+
+# Dependencies
 node_modules/
 client/node_modules/
 server/node_modules/
+jspm_packages/
 
-# Build output
+# Build outputs
 dist/
+build/
+out/
 client/dist/
 server/dist/
+client/build/
 
 # Logs
 logs/
@@ -17,23 +30,233 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Environment files
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+.nyc_output/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# parcel-bundler cache
+.cache
+.parcel-cache
+
+# Next.js build output
+.next
+
+# Nuxt.js build / generate output
+.nuxt
+
+# Gatsby files
+.cache/
+public
+
+# Storybook build outputs
+.out
+.storybook-out
+
+# =============================================================================
+# Terraform Infrastructure (CRITICAL - Contains Secrets)
+# =============================================================================
+
+# Terraform state files (contain sensitive resource information)
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+terraform.tfstate*
+.terraform.tfstate.lock.info
+
+# Terraform variable files (contain secrets and configuration)
+*.tfvars
+*.tfvars.json
+*.auto.tfvars
+*.auto.tfvars.json
+local.tfvars
+dev.tfvars
+test.tfvars
+staging.tfvars
+prod.tfvars
+production.tfvars
+
+# Environment-specific variable files
+environments/*/terraform.tfvars
+environments/*/*.tfvars
+environments/*/*.auto.tfvars
+
+# Terraform plan files (may contain sensitive data)
+*tfplan*
+*.tfplan
+*.plan
+
+# Terraform directories and cache
+**/.terraform/*
+.terraform/
+.terraform.lock.hcl
+.terraform.d/
+
+# Terraform override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Terraform CLI configuration
+.terraformrc
+terraform.rc
+
+# Terraform crash logs
+crash.log
+crash.*.log
+
+# =============================================================================
+# Environment Files (CRITICAL - Contains Secrets)
+# =============================================================================
+
+# All environment files
 .env
 .env.*
-!*.example
+!.env.example
+!.env.template
 
-# OS/Editor files
-.DS_Store
-.idea/
-.vscode/*
-!.vscode/extensions.json
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+# Environment-specific configs
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.staging
+.env.development
+.env.test
 
-# Media files (generated or uploaded)
+# =============================================================================
+# Cloud Provider Credentials & Configuration
+# =============================================================================
+
+# Azure CLI
+.azure/
+azure.json
+
+# AWS CLI
+.aws/
+aws.json
+.aws-sam/
+
+# Google Cloud
+.gcloud/
+gcp.json
+service-account*.json
+
+# Kubernetes
+*.kubeconfig
+kubeconfig*
+k8s-secret*
+
+# Docker secrets
+docker-compose.override.yml
+.docker/
+
+# =============================================================================
+# Security & Secrets (CRITICAL)
+# =============================================================================
+
+# API keys and secrets
+*api-key*
+*api_key*
+*apikey*
+*secret*
+*password*
+*credential*
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.cer
+*.der
+
+# SSH keys
+id_rsa*
+id_ed25519*
+*.pub
+authorized_keys
+known_hosts
+
+# Deployment tokens
+*token*
+*deploy*key*
+deployment-token.*
+
+# Configuration with secrets
+config/secrets.json
+config/production.json
+secrets/
+.secrets/
+secrets.*
+*secrets*
+*.secret
+secret.txt
+
+# Password files
+*password*
+*credentials*
+*auth*
+
+# Database connection files
+database.json
+db.json
+connection-string.txt
+
+# =============================================================================
+# Generated Documentation & Reports (Contains Sensitive Data)
+# =============================================================================
+
+# Infrastructure deployment reports (contain keys and URLs)
+IAC/DEPLOYMENT_SUCCESS.md
+IAC/APPLICATION_KEYS.md
+IAC/VALIDATION_REPORT.md
+IAC/OUTPUTS_BEST_PRACTICES.md
+IAC/SECURITY.md
+
+# Generated terraform docs
+terraform-docs.md
+*-generated.md
+
+# Cost reports (may contain subscription info)
+cost-report.*
+billing-report.*
+
+# =============================================================================
+# Media Files (Generated or Uploaded)
+# =============================================================================
+
+# Audio files
 *.wav
 *.mp3
 *.webm
@@ -42,16 +265,143 @@ lerna-debug.log*
 *.aac
 *.flac
 
-# Database/data
+# Video files
+*.mp4
+*.avi
+*.mov
+*.wmv
+
+# =============================================================================
+# Database & Data Files
+# =============================================================================
+
+# Database files
 server/data/
 server/data/*
 *.db
 *.sqlite
+*.sqlite3
 
-# Package lock files (keep these tracked for reproducibility)
-# (Do NOT ignore package-lock.json unless you have a specific reason)
-# package-lock.json
+# Backup files
+*.backup
+*.bak
 
-# Temp folders
+# =============================================================================
+# Operating System Files
+# =============================================================================
+
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+
+# =============================================================================
+# Editor & IDE Files
+# =============================================================================
+
+# Visual Studio Code
+.vscode/*
+!.vscode/extensions.json
+
+# IntelliJ IDEA
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Vim
+*.swp
+*.swo
+
+# Other editors
+.project
+.settings/
+.classpath
+
+# =============================================================================
+# Temporary & Backup Files
+# =============================================================================
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+temp/
 server/src/temp/
 server/dist/temp/
+
+# Backup files
+*~
+.#*
+#*#
+
+# =============================================================================
+# CI/CD & Deployment Files
+# =============================================================================
+
+# GitHub Actions secrets
+.github/secrets/
+action-secrets.*
+
+# Azure DevOps
+azure-pipelines-secrets.yml
+*-secrets.yml
+
+# =============================================================================
+# Development & Testing Files
+# =============================================================================
+
+# Test output
+test-results/
+test-output/
+coverage/
+
+# Debug files
+debug.log
+trace.log
+
+# Local development
+local/
+dev/
+.local/
+
+# =============================================================================
+# Allow Specific Template Files (Override patterns above)
+# =============================================================================
+
+# Terraform templates (no actual values)
+!*.tfvars.example
+!*.tfvars.template
+!example.tfvars
+!template.tfvars
+
+# Environment templates
+!.env.example
+!.env.template
+
+# =============================================================================
+# SECURITY REMINDERS
+# =============================================================================
+
+# 1. Always review files before committing: git diff --cached
+# 2. Use git secrets or similar tools to scan for secrets
+# 3. Rotate any secrets that were accidentally committed
+# 4. Consider using Azure Key Vault for production secrets
+# 5. Use environment variables for sensitive configuration
+# 6. Run security check: .\IAC\check-security.ps1
