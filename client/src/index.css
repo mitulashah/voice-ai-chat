@@ -19,7 +19,7 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  background: #032139 !important;
   color: #1a1a1a;
   font-size: 16px;
   line-height: 1.5;
@@ -159,6 +159,13 @@ button:focus,
 button:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.3);
+}
+
+/* Remove focus ring on AccordionSummary buttons */
+.MuiButtonBase-root.MuiAccordionSummary-root:focus,
+.MuiButtonBase-root.MuiAccordionSummary-root:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 /* Light theme overrides */

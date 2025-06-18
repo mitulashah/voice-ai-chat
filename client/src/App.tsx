@@ -3,6 +3,7 @@ import ChatInterface from './components/ChatInterface';
 import TemplateProvider from './context/TemplateContextProvider';
 import ChatProvider from './context/ChatContextProvider';
 import { VoiceProvider } from './context/VoiceContext';
+import { EvaluationProvider } from './context/EvaluationContext';
 
 // Create a Spectrum-inspired theme
 const theme = createTheme({
@@ -120,7 +121,9 @@ function App() {
       <VoiceProvider>
         <TemplateProvider>
           <ChatProvider>
-            <ChatInterface />
+            <EvaluationProvider>
+              <ChatInterface />
+            </EvaluationProvider>
           </ChatProvider>
         </TemplateProvider>
       </VoiceProvider>

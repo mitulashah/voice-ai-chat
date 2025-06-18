@@ -405,3 +405,11 @@ dev/
 # 4. Consider using Azure Key Vault for production secrets
 # 5. Use environment variables for sensitive configuration
 # 6. Run security check: .\IAC\check-security.ps1
+=======
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+terraform.tfvars
+.terraform.lock.hcl

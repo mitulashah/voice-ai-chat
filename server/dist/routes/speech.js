@@ -16,11 +16,19 @@ const router = (0, express_1.Router)();
 router.post('/recognize', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { audioData } = req.body;
+        console.log('Speech recognition request received, audioData length:', (audioData === null || audioData === void 0 ? void 0 : audioData.length) || 'undefined');
         const result = yield (0, speechServiceApi_1.recognizeSpeech)(audioData);
+        console.log('Speech recognition successful:', result);
         res.json({ text: result });
     }
     catch (error) {
-        res.status(500).json({ error: 'Speech recognition failed' });
+        console.error('Speech recognition failed:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        res.status(500).json({
+            error: 'Speech recognition failed',
+            details: errorMessage,
+            type: error instanceof Error ? error.constructor.name : 'Unknown'
+        });
     }
 }));
 // POST /api/speech/synthesize - Text-to-speech endpoint

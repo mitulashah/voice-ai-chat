@@ -1,6 +1,22 @@
-import React, { useEffect, useState } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Typography, Box, Button, Paper, IconButton, Tooltip, Snackbar, Alert } from '@mui/material';
-import { ContentCopy as ContentCopyIcon } from '@mui/icons-material';
+import React, { useEffect, useState, useRef } from 'react';
+import { Dialog, DialogTitle, DialogContent } from '@mui/material';
+import { useEvaluation } from '../context/EvaluationContext';
+import { copyToClipboard, buildConversationData, formatDuration } from '../utils/exportDialogUtils';
+import { useCopySnackbar } from '../hooks/useCopySnackbar';
+import { parseExportData } from '../utils/exportDataParser';
+import type { ExportData } from '../utils/exportDataParser';
+import { useAccordionState } from '../hooks/useAccordionState';
+import ExportDialogEvaluationContext from './ExportDialogEvaluationContext';
+import ExportDialogStatistics from './ExportDialogStatistics';
+import ExportDialogEvaluationCriteria from './ExportDialogEvaluationCriteria';
+import ExportDialogJsonTranscript from './ExportDialogJsonTranscript';
+import ExportDialogEvaluationResults from './ExportDialogEvaluationResults';
+import ExportDialogActions from './ExportDialogActions';
+import ExportDialogSnackbar from './ExportDialogSnackbar';
+import jsPDF from 'jspdf';
+import { marked } from 'marked';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 interface ExportDialogProps {
   exportJson: string | null;
@@ -10,44 +26,73 @@ interface ExportDialogProps {
 
 const ExportDialog: React.FC<ExportDialogProps> = ({ exportJson, onClose, onDownload }) => {
   const [stats, setStats] = useState<{ speechDurationSeconds: number; audioCharacterCount: number } | null>(null);
-  const [copySuccess, setCopySuccess] = useState(false);
-    // Parse the export data to extract comprehensive information
-  const exportData = exportJson ? JSON.parse(exportJson) : null;
-  
+  const [copySuccess, showCopySuccess, closeCopySuccess] = useCopySnackbar();
+  // Use evaluation context
+  const { evaluateConversation, isEvaluating, lastEvaluation, error: evaluationError } = useEvaluation();
+  // Accordion state management with custom hook
+  const { isExpanded, handleChange, setPanels } = useAccordionState(['context', 'stats']);
+  // Reset panels when dialog opens: open context and stats
+  useEffect(() => {
+    if (exportJson) {
+      setPanels(['context', 'stats']);
+    }
+  }, [exportJson, setPanels]);
+  // On AI evaluation complete, collapse all except evaluation
+  useEffect(() => {
+    if (lastEvaluation || evaluationError) {
+      setPanels(['evaluation']);
+    }
+  }, [lastEvaluation, evaluationError, setPanels]);
+
+  // Prepare markdown text for ReactMarkdown, ensure it's string
+  const markdownText = lastEvaluation
+    ? typeof lastEvaluation.markdown === 'string'
+      ? lastEvaluation.markdown
+      : (console.error('Expected markdown string but got', lastEvaluation.markdown), String(lastEvaluation.markdown))
+    : '';
+
+  // Parse the export data with type safety
+  const exportData: ExportData | null = parseExportData(exportJson);
+
   // Legacy support for old export format
   const totalTokens = exportData?.stats?.totalTokensUsed || exportData?.totalTokensUsed || 0;
   const messageCount = exportData?.conversation?.messageCount || exportData?.messageCount || 0;
   const durationMs = exportData?.stats?.totalDurationMs || exportData?.totalDurationMs || 0;
-  const durationMinutes = Math.floor(durationMs / 60000);
-  const durationSeconds = Math.floor((durationMs % 60000) / 1000);
-  
+
   // New comprehensive data
   const context = exportData?.context || {};
   const evaluationCriteria = exportData?.evaluationCriteria || {};
-  
-  // Show "No conversation" if no user messages were sent
-  const hasUserMessages = messageCount > 0;  const displayDuration = hasUserMessages 
-    ? `${durationMinutes}:${durationSeconds.toString().padStart(2, '0')}`
-    : '0:00';
+
+  // Inline hasUserMessages usage for displayDuration
+  const displayDuration = formatDuration(durationMs, messageCount > 0);
 
   // Copy to clipboard function
   const handleCopyToClipboard = async () => {
     if (!exportJson) return;
-    
     try {
-      await navigator.clipboard.writeText(exportJson);
-      setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 2000);
+      await copyToClipboard(exportJson);
+      showCopySuccess();
+      setTimeout(() => closeCopySuccess(), 2000);
     } catch (err) {
       console.error('Failed to copy to clipboard:', err);
     }
+  };
+
+  // Handle AI evaluation
+  const handleAIEvaluation = async () => {
+    if (!exportData) return;
+    // Collapse all except evaluation before starting
+    setPanels(['evaluation']);
+    const conversationData = buildConversationData(exportData);
+    if (!conversationData) return;
+    await evaluateConversation(conversationData);
   };
 
   useEffect(() => {
     if (!exportJson) return;
     const fetchStats = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/stats');
+        const res = await fetch(`${API_BASE_URL}/api/stats`);
         const data = await res.json();
         setStats({ speechDurationSeconds: data.speechDurationSeconds, audioCharacterCount: data.audioCharacterCount });
       } catch (e) {
@@ -57,261 +102,92 @@ const ExportDialog: React.FC<ExportDialogProps> = ({ exportJson, onClose, onDown
     fetchStats();
   }, [exportJson]);
 
-  return (    <Dialog
+  // Ref for the markdown section
+  const evaluationPdfRef = useRef<HTMLDivElement>(null!);
+
+  // PDF download handler (markdown to PDF)
+  const handleDownloadEvaluationPdf = async () => {
+    if (!markdownText) return;
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const html = await marked.parse(markdownText) as string;
+    const container = document.createElement('div');
+    container.innerHTML = html;
+    doc.html(container, {
+      callback: function (doc) {
+        doc.save('evaluation-summary.pdf');
+      },
+      x: 32,
+      y: 32,
+      width: 530, // fit to A4
+      windowWidth: 800,
+    });
+  };
+
+  return (
+    <Dialog
       open={Boolean(exportJson)}
       onClose={onClose}
       maxWidth="md"
       fullWidth
       disableRestoreFocus={false}
       disableEnforceFocus={false}
-    ><DialogTitle sx={{ pb: 1, fontSize: '1.1rem' }}>
-        {exportData?.evaluationCriteria?.scenarioId 
-          ? 'Scenario Evaluation Export' 
-          : 'Export Conversation'
-        }
-      </DialogTitle>
-      <DialogContent sx={{ pt: 1 }}>
-        
-        {/* Context Information - Only show if comprehensive data is available */}
-        {exportData?.context && (
-          <Paper elevation={1} sx={{ p: 1.5, mb: 1.5, bgcolor: '#e8f5e8' }}>            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, fontSize: '0.875rem' }}>
-              Evaluation Context
-            </Typography>
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 1, fontSize: '0.75rem' }}>
-              {context.persona && (
-                <Box>
-                  <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary' }}>
-                    Persona:
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
-                    {context.persona.name}
-                  </Typography>
-                </Box>
-              )}
-              {context.scenario && (
-                <Box>
-                  <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary' }}>
-                    Scenario:
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
-                    {context.scenario.name}
-                  </Typography>
-                </Box>
-              )}
-              {context.mood && (
-                <Box>
-                  <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary' }}>
-                    Mood:
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
-                    {context.mood.mood}
-                  </Typography>
-                </Box>
-              )}
-              {context.voice && (
-                <Box>
-                  <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary' }}>
-                    Voice:
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
-                    {context.voice}
-                  </Typography>
-                </Box>
-              )}
-              {context.generatedName && (
-                <Box>
-                  <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary' }}>
-                    Generated Name:
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
-                    {context.generatedName.full} ({context.generatedName.gender})
-                  </Typography>
-                </Box>
-              )}
-              {context.template && (
-                <Box>
-                  <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary' }}>
-                    Template:
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
-                    {context.template.name}
-                  </Typography>
-                </Box>
-              )}
-            </Box>
-          </Paper>
-        )}
-        
-        {/* Conversation Statistics */}
-        <Paper elevation={1} sx={{ p: 1.5, mb: 1.5, bgcolor: '#f8f9fa' }}>
-          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, fontSize: '0.875rem' }}>
-            Statistics
-          </Typography>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>  
-            {/* First row: Tokens, Messages, Duration */}
-            <Box textAlign="center" sx={{ flex: 1 }}>
-              <Typography variant="h6" color="primary" fontWeight="bold" sx={{ fontSize: '1.1rem' }}>
-                {totalTokens.toLocaleString()}
-              </Typography>
-              <Typography variant="caption" color="textSecondary" sx={{ fontSize: '0.7rem' }}>
-                Tokens
-              </Typography>
-            </Box>
-            <Box textAlign="center" sx={{ flex: 1 }}>
-              <Typography variant="h6" color="secondary" fontWeight="bold" sx={{ fontSize: '1.1rem' }}>
-                {messageCount}
-              </Typography>
-              <Typography variant="caption" color="textSecondary" sx={{ fontSize: '0.7rem' }}>
-                Messages
-              </Typography>
-            </Box>
-            <Box textAlign="center" sx={{ flex: 1 }}>
-              <Typography variant="h6" color="success.main" fontWeight="bold" sx={{ fontSize: '1.1rem' }}>
-                {displayDuration}
-              </Typography>
-              <Typography variant="caption" color="textSecondary" sx={{ fontSize: '0.7rem' }}>
-                Duration
-              </Typography>
-            </Box>
-          </Box>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
-            {/* Second row: Avg/Msg, Speech Secs (export duration), Audio Chars */}
-            <Box textAlign="center" sx={{ flex: 1 }}>
-              <Typography variant="h6" color="warning.main" fontWeight="bold" sx={{ fontSize: '1.1rem' }}>
-                {messageCount > 0 ? Math.round(totalTokens / messageCount) : 0}
-              </Typography>
-              <Typography variant="caption" color="textSecondary" sx={{ fontSize: '0.7rem' }}>
-                Avg/Msg
-              </Typography>
-            </Box>
-            {stats && (
-              <>
-                <Box textAlign="center" sx={{ flex: 1 }}>
-                  <Typography variant="h6" color="info.main" fontWeight="bold" sx={{ fontSize: '1.1rem' }}>
-                    {stats.speechDurationSeconds.toFixed(2)} s
-                  </Typography>
-                  <Typography variant="caption" color="textSecondary" sx={{ fontSize: '0.7rem' }}>
-                    Speech Secs
-                  </Typography>
-                </Box>
-                <Box textAlign="center" sx={{ flex: 1 }}>
-                  <Typography variant="h6" color="info.dark" fontWeight="bold" sx={{ fontSize: '1.1rem' }}>
-                    {stats.audioCharacterCount.toLocaleString()}
-                  </Typography>
-                  <Typography variant="caption" color="textSecondary" sx={{ fontSize: '0.7rem' }}>
-                    Audio Chars
-                  </Typography>
-                </Box>
-              </>
-            )}
-          </Box>        </Paper>        {/* Evaluation Criteria - Only show if available */}
-        {exportData?.evaluationCriteria?.suggestedEvaluationAreas && (
-          <Paper elevation={1} sx={{ p: 1.5, mb: 1.5, bgcolor: '#fff3e0' }}>
-            <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, fontSize: '0.875rem' }}>
-              {exportData.evaluationCriteria.scenarioDetails?.title 
-                ? `Evaluation Criteria - ${exportData.evaluationCriteria.scenarioDetails.title}`
-                : 'Suggested Evaluation Areas'
-              }
-            </Typography>
-            
-            {/* Show scenario details if available */}
-            {exportData.evaluationCriteria.scenarioDetails && (
-              <Box sx={{ mb: 1.5, p: 1, bgcolor: 'rgba(255,255,255,0.7)', borderRadius: 1 }}>
-                <Typography variant="body2" sx={{ fontSize: '0.75rem', mb: 0.5 }}>
-                  <strong>Type:</strong> {exportData.evaluationCriteria.scenarioDetails.scenarioType}
-                  {exportData.evaluationCriteria.scenarioDetails.difficultyLevel && (
-                    <span> | <strong>Difficulty:</strong> {exportData.evaluationCriteria.scenarioDetails.difficultyLevel}</span>
-                  )}
-                  {exportData.evaluationCriteria.scenarioDetails.expectedDurationSeconds && (
-                    <span> | <strong>Expected Duration:</strong> {Math.round(exportData.evaluationCriteria.scenarioDetails.expectedDurationSeconds / 60)} min</span>
-                  )}
-                </Typography>
-                {exportData.evaluationCriteria.scenarioDetails.description && (
-                  <Typography variant="body2" sx={{ fontSize: '0.75rem', fontStyle: 'italic' }}>
-                    {exportData.evaluationCriteria.scenarioDetails.description}
-                  </Typography>
-                )}
-              </Box>
-            )}
-              <Box component="div" sx={{ pl: 0 }}>
-              {evaluationCriteria.suggestedEvaluationAreas.map((area: string, index: number) => (
-                <Typography 
-                  key={index} 
-                  variant="body2" 
-                  sx={{ 
-                    fontSize: '0.75rem', 
-                    mb: 0.5,
-                    fontWeight: area.includes(':') ? 600 : 400,
-                    color: area.startsWith('  •') ? 'text.secondary' : 'text.primary'
-                  }}
-                >
-                  {area}
-                </Typography>
-              ))}
-            </Box>
-          </Paper>
-        )}        {/* JSON Export */}
-        <Box sx={{ position: 'relative', mb: 1.5 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: '0.875rem' }}>
-              JSON Export
-            </Typography>
-            <Tooltip title={copySuccess ? "Copied!" : "Copy to clipboard"}>
-              <IconButton
-                onClick={handleCopyToClipboard}
-                size="small"
-                sx={{ 
-                  color: copySuccess ? 'success.main' : 'text.secondary',
-                  '&:hover': { color: 'primary.main' }
-                }}
-              >
-                <ContentCopyIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          </Box>
-          <Box 
-            component="pre" 
-            sx={{ 
-              bgcolor: '#f5f5f5', 
-              p: 1, 
-              borderRadius: 1, 
-              maxHeight: 180, 
-              overflow: 'auto',
-              fontSize: '0.7rem',
-              fontFamily: 'monospace',
-              border: '1px solid #e0e0e0'
-            }}
-          >
-            {exportJson}
-          </Box>
-        </Box>
-        
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={() => exportJson && onDownload(exportJson)}
-          size="small"
-          fullWidth
-        >
-          Download JSON
-        </Button>
+    >
+      <DialogTitle>Evaluation Summary</DialogTitle>
+      <DialogContent>
+        {/* Evaluation Context Section */}
+        <ExportDialogEvaluationContext
+          expanded={isExpanded('context')}
+          onChange={handleChange('context')}
+          context={context}
+        />
+
+        {/* Statistics Section */}
+        <ExportDialogStatistics
+          expanded={isExpanded('stats')}
+          onChange={handleChange('stats')}
+          totalTokens={totalTokens}
+          messageCount={messageCount}
+          displayDuration={displayDuration}
+          stats={stats}
+        />
+
+        {/* Evaluation Criteria Section */}
+        <ExportDialogEvaluationCriteria
+          expanded={isExpanded('criteria')}
+          onChange={handleChange('criteria')}
+          evaluationCriteria={evaluationCriteria}
+        />
+
+        {/* JSON Transcript Section */}
+        <ExportDialogJsonTranscript
+          expanded={isExpanded('transcript')}
+          onChange={handleChange('transcript')}
+          exportJson={exportJson}
+          copySuccess={copySuccess}
+          onCopy={handleCopyToClipboard}
+        />
+
+        {/* AI Evaluation Results Section */}
+        <ExportDialogEvaluationResults
+          expanded={isExpanded('evaluation')}
+          onChange={handleChange('evaluation')}
+          evaluationError={evaluationError}
+          lastEvaluation={lastEvaluation}
+          evaluationPdfRef={evaluationPdfRef}
+          markdownText={markdownText}
+          isEvaluating={isEvaluating}
+        />
+
       </DialogContent>
-      <DialogActions sx={{ pt: 0, pb: 1 }}>        <Button onClick={onClose} size="small">
-          Close
-        </Button>
-      </DialogActions>
-      
-      {/* Copy success feedback */}
-      <Snackbar
-        open={copySuccess}
-        autoHideDuration={2000}
-        onClose={() => setCopySuccess(false)}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert severity="success" variant="filled" sx={{ fontSize: '0.875rem' }}>
-          JSON copied to clipboard!
-        </Alert>
-      </Snackbar>
+      <ExportDialogActions
+        onAIEvaluation={handleAIEvaluation}
+        isEvaluating={isEvaluating}
+        exportDataHasMessages={!!exportData?.conversation?.messages?.some((msg: any) => msg.role !== 'system')}
+        onDownload={() => onDownload(exportJson!)}
+        onDownloadPdf={handleDownloadEvaluationPdf}
+        onClose={onClose}
+      />
+      <ExportDialogSnackbar open={copySuccess} onClose={closeCopySuccess} />
     </Dialog>
   );
 };

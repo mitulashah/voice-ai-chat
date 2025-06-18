@@ -2,6 +2,8 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import axios from 'axios';
 import type { Mood } from './mood-types';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL;
+
 interface MoodContextData {
   moods: Mood[];
   selectedMood: Mood | null;
@@ -26,7 +28,7 @@ export const MoodProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     setLoading(true);
-    axios.get<{ moods: Mood[] }>('/api/moods')
+    axios.get<{ moods: Mood[] }>(`${API_BASE_URL}/api/moods`)
       .then(res => {
         setMoods(res.data.moods || []);
         setError(null);

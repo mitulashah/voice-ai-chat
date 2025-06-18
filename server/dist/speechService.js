@@ -53,6 +53,9 @@ const statsService_1 = __importDefault(require("./services/statsService"));
 // Function to perform speech recognition
 function performSpeechRecognition(wavFilePath) {
     return __awaiter(this, void 0, void 0, function* () {
+        console.log('Starting speech recognition for:', wavFilePath);
+        console.log('Azure Speech Key:', process.env.AZURE_SPEECH_KEY ? `${process.env.AZURE_SPEECH_KEY.substring(0, 8)}...` : 'MISSING');
+        console.log('Azure Speech Region:', process.env.AZURE_SPEECH_REGION || 'MISSING');
         const audioConfig = sdk.AudioConfig.fromWavFileInput(yield fsExtra.readFile(wavFilePath));
         const speechConfig = sdk.SpeechConfig.fromSubscription(process.env.AZURE_SPEECH_KEY || '', process.env.AZURE_SPEECH_REGION || '');
         speechConfig.speechRecognitionLanguage = 'en-US';
@@ -84,7 +87,9 @@ function performSpeechRecognition(wavFilePath) {
 function processAudioForSpeechRecognition(audioData) {
     return __awaiter(this, void 0, void 0, function* () {
         var _a;
+        console.log('processAudioForSpeechRecognition called with audioData length:', (audioData === null || audioData === void 0 ? void 0 : audioData.length) || 'undefined');
         if (!audioData) {
+            console.error('No audio data provided');
             throw new Error('No audio data provided');
         }
         const tempDir = path.join(__dirname, 'temp');

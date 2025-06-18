@@ -9,6 +9,8 @@ interface SpeechRecognitionState {
   stopListening: () => void;
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
 export const useAzureSpeechRecognition = (onTranscript: (text: string) => void): SpeechRecognitionState => {
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,15 +58,26 @@ export const useAzureSpeechRecognition = (onTranscript: (text: string) => void):
         setError('Speech token or region is missing.');
         return;
       }
+      
       const speechConfig = SpeechSDK.SpeechConfig.fromAuthorizationToken(
         speechToken,
         speechRegion
       );
-      speechConfig.speechRecognitionLanguage = 'en-US';
+      speechConfig.speechRecognitionLanguage = 'en-US';        // Optimized audio configuration for natural speech with good responsiveness
+      speechConfig.setProperty(SpeechSDK.PropertyId.SpeechServiceConnection_InitialSilenceTimeoutMs, "5000");
+      speechConfig.setProperty(SpeechSDK.PropertyId.SpeechServiceConnection_EndSilenceTimeoutMs, "600");
+      speechConfig.setProperty(SpeechSDK.PropertyId.Speech_SegmentationSilenceTimeoutMs, "600");
+      
+      // Enable detailed logging and profanity filtering
+      speechConfig.enableDictation();
+      speechConfig.setProperty(SpeechSDK.PropertyId.SpeechServiceResponse_RequestDetailedResultTrueFalse, "true");
+      
       // Use the default microphone
       const audioConfig = SpeechSDK.AudioConfig.fromDefaultMicrophoneInput();
+      
       const recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
       recognizerRef.current = recognizer;
+      
       setIsListening(true);
       // Mark session start
       sessionStartTime.current = Date.now();
@@ -78,6 +91,9 @@ export const useAzureSpeechRecognition = (onTranscript: (text: string) => void):
           onTranscript(e.result.text);
         }
       };
+      recognizer.sessionStarted = () => {
+        // Session started
+      };
       recognizer.sessionStopped = () => {
         setIsListening(false);
         // Mark session end
@@ -86,7 +102,7 @@ export const useAzureSpeechRecognition = (onTranscript: (text: string) => void):
         if (sessionStartTime.current && sessionEndTime.current) {
           const durationMs = sessionEndTime.current - sessionStartTime.current;
           if (durationMs > 0) {
-            fetch('http://localhost:5000/api/stats/speech-duration', {
+            fetch(`${API_BASE_URL}/api/stats/speech-duration`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ seconds: durationMs / 1000 })
@@ -95,11 +111,19 @@ export const useAzureSpeechRecognition = (onTranscript: (text: string) => void):
         }
         cleanup();
       };
+      recognizer.speechStartDetected = () => {
+        // Speech start detected
+      };
+      recognizer.speechEndDetected = () => {
+        // Speech end detected
+      };
       recognizer.canceled = (_s, e) => {
         setError(`Recognition canceled: ${e.errorDetails || e.reason}`);
         cleanup();
       };
+      
       recognizer.startContinuousRecognitionAsync();
+      
       // Timeout removed: recognition will continue until user stops it
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start recognition');

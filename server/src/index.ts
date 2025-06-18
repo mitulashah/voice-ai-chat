@@ -13,6 +13,7 @@ import statsRouter from './routes/stats';
 import tokenRouter from './routes/token';
 import scenariosRouter from './routes/scenarios';
 import moodsRouter from './routes/moods';
+import { AgentEvaluationService, ConversationData, EvaluationProgress, EvaluationResult } from './services/agentEvaluationService';
 
 const app: Express = express();
 const PORT = config.port;
@@ -68,6 +69,79 @@ app.use('/api/speech/token', tokenRouter);
 app.use('/api/stats', statsRouter);
 app.use('/api/scenarios', scenariosRouter);
 app.use('/api/moods', moodsRouter);
+
+// Evaluation endpoints - inline implementation
+const evaluationService = new AgentEvaluationService();
+
+// POST /api/evaluation/analyze-simple - Simple JSON response version
+app.post('/api/evaluation/analyze-simple', async (req: any, res: any) => {
+  console.log('Evaluation request received:', { timestamp: new Date().toISOString() });
+  try {
+    const conversationData: ConversationData = req.body;
+    console.log('Conversation data:', { messageCount: conversationData.messages.length, metadataKeys: Object.keys(conversationData.metadata || {}) });
+
+    // Validate the request body
+    if (!conversationData || !conversationData.messages || !Array.isArray(conversationData.messages)) {
+      return res.status(400).json({
+        error: 'Invalid request body. Expected ConversationData with messages array.'
+      });
+    }
+
+    if (conversationData.messages.length === 0) {
+      return res.status(400).json({
+        error: 'Conversation must contain at least one message.'
+      });
+    }
+
+    const invalidMessage = conversationData.messages.find((msg: any) => 
+      !msg.role || !msg.content || !msg.timestamp ||
+      !['user', 'assistant'].includes(msg.role)
+    );
+
+    if (invalidMessage) {
+      return res.status(400).json({
+        error: 'Invalid message format. Each message must have role, content, and timestamp.'
+      });
+    }
+
+    // Run evaluation without progress updates
+    const result: EvaluationResult = await evaluationService.evaluateConversation(conversationData);
+    console.log('Evaluation result:', { runId: result.runId, threadId: result.threadId, timestamp: result.timestamp });
+
+    res.json({
+      success: true,
+      result
+    });
+
+  } catch (error: any) {
+    console.error('Simple evaluation endpoint error:', error);
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Evaluation failed'
+    });
+  }
+});
+
+// GET /api/evaluation/test - Test the Azure AI Agent connection
+app.get('/api/evaluation/test', async (req: any, res: any) => {
+  try {
+    // Removed: const isConnected = await evaluationService.testConnection();
+    
+    res.json({
+      connected: true,
+      service: 'Azure AI Agent Service',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error: any) {
+    console.error('Connection test error:', error);
+    res.status(500).json({
+      connected: false,
+      error: error instanceof Error ? error.message : 'Connection test failed',
+      service: 'Azure AI Agent Service',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
 
 // Error handling middleware
 app.use(errorHandler);

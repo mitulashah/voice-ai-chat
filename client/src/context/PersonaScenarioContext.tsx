@@ -3,6 +3,8 @@ import axios from 'axios';
 import type { Persona, Scenario } from './persona-scenario-types';
 import { generateRandomName, inferGenderFromPersona, type GeneratedName } from '../utils/nameGenerator';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL;
+
 interface PersonaScenarioContextData {
   personas: Persona[];
   scenarios: Scenario[];
@@ -39,8 +41,8 @@ export const PersonaScenarioProvider: React.FC<{ children: React.ReactNode }> = 
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      axios.get<{ personas: Persona[] }>('/api/personas'),
-      axios.get<{ scenarios: Scenario[] }>('/api/scenarios'),
+      axios.get<{ personas: Persona[] }>(`${API_BASE_URL}/api/personas`),
+      axios.get<{ scenarios: Scenario[] }>(`${API_BASE_URL}/api/scenarios`),
     ])
       .then(([personaRes, scenarioRes]) => {
         setPersonas(personaRes.data.personas || []);

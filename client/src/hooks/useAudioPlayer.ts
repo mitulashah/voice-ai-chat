@@ -7,6 +7,8 @@ interface AudioPlayerState {
   stopAudio: () => void;
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
 export const useAudioPlayer = (): AudioPlayerState => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentPlayingId, setCurrentPlayingId] = useState<string | null>(null);
@@ -30,7 +32,7 @@ export const useAudioPlayer = (): AudioPlayerState => {
       }
 
       // Fetch the full MP3 audio as a blob
-      const response = await fetch('http://localhost:5000/api/speech/synthesize', {
+      const response = await fetch(`${API_BASE_URL}/api/speech/synthesize`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, voiceGender, voiceName })
