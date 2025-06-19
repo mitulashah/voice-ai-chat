@@ -60,3 +60,31 @@ variable "subscription_id" {
   description = "Azure Subscription ID."
   type        = string
 }
+
+variable "client_image_tag" {
+  description = "Tag for the client Docker image"
+  type        = string
+  default     = "latest"
+}
+
+variable "server_image_tag" {
+  description = "Tag for the server Docker image"
+  type        = string
+  default     = "latest"
+}
+
+variable "deployer_user_principal_name" {
+  description = "Azure AD user principal name (email) for the deployment user to grant Key Vault access."
+  type        = string
+}
+
+variable "deployer_object_id" {
+  description = "Object ID for the deployment user or service principal to grant Key Vault access."
+  type        = string
+}
+
+variable "vite_api_url" {
+  description = "API URL for the client app (used as VITE_API_URL)."
+  type        = string
+  default     = ""
+}

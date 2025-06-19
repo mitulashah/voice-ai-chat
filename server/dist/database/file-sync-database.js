@@ -35,13 +35,20 @@ class FileSyncDatabase extends document_database_1.DocumentDatabase {
     }
     initialize() {
         return __awaiter(this, void 0, void 0, function* () {
+            // Ensure the base DocumentDatabase is fully initialized before syncing files
+            if (!this.isInitialized) {
+                // Wait until the base class async initialization is done
+                while (!this.isInitialized) {
+                    yield new Promise(resolve => setTimeout(resolve, 50));
+                }
+            }
             if (this.syncOnStartup) {
                 console.log('🔄 Starting initial file sync...');
                 yield this.syncAllFiles();
                 console.log('✅ Initial file sync completed');
             }
             if (this.watchFiles) {
-                console.log('👁️  Starting file watchers...');
+                console.log('👀  Starting file watchers...');
                 this.startFileWatchers();
                 console.log('✅ File watchers started');
             }
