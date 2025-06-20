@@ -1,0 +1,21 @@
+# Local Development Variables Template for Voice AI Chat
+# Copy this file to local.tfvars and fill in your actual values
+# DO NOT commit local.tfvars - it contains sensitive information
+
+project_name            = "voice-ai-chat-your-name"
+environment             = "local"
+location                = "East US 2"  # or your preferred region
+static_web_app_location = "East US 2"  # or your preferred region
+
+# Cost-optimized SKUs for local development/testing
+cognitive_services_sku = "F0"    # Free tier - 5,000 transactions/month
+database_sku           = "Basic" # Basic tier - ~$5/month
+app_service_sku        = "F1"    # Free tier
+static_web_app_sku     = "Free"  # Free tier
+
+# Database configuration - CHANGE THESE VALUES
+sql_admin_login    = "sqladmin"
+sql_admin_password = "ChangeThisPassword123!" # Use a strong password
+
+# Optional: Override default resource naming
+# resource_suffix = "your-unique-suffix"
