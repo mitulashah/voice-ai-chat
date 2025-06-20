@@ -4,9 +4,10 @@ client/node_modules/
 server/node_modules/
 
 # Build output
+# The following ensures server build output is not tracked
+server/dist/
 dist/
 client/dist/
-server/dist/
 
 # Logs
 logs/
