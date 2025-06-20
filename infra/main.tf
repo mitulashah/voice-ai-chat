@@ -267,6 +267,10 @@ resource "azurerm_container_app" "server" {
         name        = "MESSAGE_WINDOW_SIZE"
         value       = "20"
       }
+      env {
+        name  = "AZURE_CLIENT_ID"
+        value = azurerm_user_assigned_identity.shared.client_id
+      }
     }
     min_replicas = 1
     max_replicas = 2

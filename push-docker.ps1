@@ -1,6 +1,9 @@
-# PowerShell script to build and push client and server images to Azure Container Registry using Terraform output
+# PowerShell script to build and push client and server images to Azure Container Registry using ACR Tasks (per Azure best practices)
 
-# Stop on error
+param(
+    [switch]$Redeploy
+)
+
 $ErrorActionPreference = 'Stop'
 
 Write-Host "Retrieving ACR login server from Terraform output..."
@@ -16,33 +19,38 @@ $acrName = $acrLoginServer.Split('.')[0]
 Write-Host "ACR_NAME is [$acrName]"
 
 # Set image tags
-$clientImage = "$acrLoginServer/client:latest"
-$serverImage = "$acrLoginServer/server:latest"
+$clientImage = "client:latest"
+$serverImage = "server:latest"
 
-# Build client image
-Write-Host "Building client image..."
-Push-Location client
-npm install
-npm run build
-docker build -t $clientImage .
-Pop-Location
+# Optionally delete and recreate container apps
+if ($Redeploy) {
+    Write-Host "Redeploy flag is set. Retrieving container app details from Terraform output..."
+    $resourceGroup = terraform -chdir=infra output -raw container_app_resource_group
+    $environment = terraform -chdir=infra output -raw container_app_environment
+    $clientAppName = terraform -chdir=infra output -raw client_container_app_name
+    $serverAppName = terraform -chdir=infra output -raw server_container_app_name
 
-# Build server image
-Write-Host "Building server image..."
-Push-Location server
-npm install
-npm run build
-docker build -t $serverImage .
-Pop-Location
+    Write-Host "Deleting existing container apps..."
+    az containerapp delete --name $clientAppName --resource-group $resourceGroup --yes
+    az containerapp delete --name $serverAppName --resource-group $resourceGroup --yes
+}
 
-# Login to ACR
-Write-Host "Logging in to ACR..."
-az acr login --name $acrName
+# Build and push client image using ACR Tasks
+Write-Host "Building and pushing client image using az acr build..."
+az acr build --registry $acrName --image $clientImage --platform linux/amd64 ./client
 
-# Push images
-Write-Host "Pushing client image..."
-docker push $clientImage
-Write-Host "Pushing server image..."
-docker push $serverImage
+# Build and push server image using ACR Tasks
+Write-Host "Building and pushing server image using az acr build..."
+az acr build --registry $acrName --image $serverImage --platform linux/amd64 ./server
 
-Write-Host "Docker images built and pushed to $acrLoginServer."
+if ($Redeploy) {
+    Write-Host "Recreating container apps using Azure CLI..."
+    # Retrieve additional parameters as needed from Terraform output
+    $clientAppParams = terraform -chdir=infra output -json client_container_app_create_params | ConvertFrom-Json
+    $serverAppParams = terraform -chdir=infra output -json server_container_app_create_params | ConvertFrom-Json
+
+    az containerapp create @($clientAppParams | ConvertTo-Json -Compress) --resource-group $resourceGroup
+    az containerapp create @($serverAppParams | ConvertTo-Json -Compress) --resource-group $resourceGroup
+}
+
+Write-Host "Docker images built and pushed to $acrLoginServer via Azure Container Registry Tasks."
