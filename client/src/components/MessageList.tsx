@@ -4,6 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { VolumeUp as VolumeUpIcon } from '@mui/icons-material';
 import { useVoice } from '../context/VoiceContext';
+import { markdownComponents } from './MarkdownComponents';
 
 const MessageBubble = styled(Box, {
   shouldForwardProp: (prop) => prop !== 'isUser',
@@ -113,7 +114,14 @@ const MessageList: React.FC<MessageListProps> = ({
                 </Button>
                 <Box sx={{ pl: 1.2, width: '100%' }}>
                   {isExpanded ? (
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+                    <Box sx={{ fontSize: '0.85em' }}>
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={markdownComponents}
+                      >
+                        {message.content}
+                      </ReactMarkdown>
+                    </Box>
                   ) : (
                     <Box sx={{ fontWeight: 700, color: 'text.secondary', fontSize: '0.8em', letterSpacing: 1, textTransform: 'uppercase' }}>SYSTEM PROMPT</Box>
                   )}
@@ -164,7 +172,12 @@ const MessageList: React.FC<MessageListProps> = ({
                   }),
                 }}
               >
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={markdownComponents}
+                >
+                  {message.content}
+                </ReactMarkdown>
               </MessageBubble>
               {message.role === 'assistant' && (
                 <IconButton
