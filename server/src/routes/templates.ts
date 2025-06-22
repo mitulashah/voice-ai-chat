@@ -1,14 +1,139 @@
 import { Router, Request, Response } from 'express';
 import { getAllTemplates, getTemplateById, searchTemplates, getTemplatesByModel, getAllTemplateNames } from '../services/templateService';
+import { DatabaseServiceFactory } from '../services/database-service-factory';
 import type { Template } from '../types/api';
-import { databaseServiceFactory } from '../services/database-service-factory';
 
 const router = Router();
+
+// Get DocumentService instance
+const databaseServiceFactory = DatabaseServiceFactory.getInstance();
+
+// POST /api/templates - Create a new template
+router.post('/', async (req: Request, res: Response) => {
+  try {
+    const documentService = databaseServiceFactory.getDocumentService();
+    if (!documentService) {
+      res.status(503).json({ 
+        success: false, 
+        error: 'DocumentService not available. Check server initialization.' 
+      });
+      return;
+    }
+
+    const templateData = req.body;
+    
+    // Validate required fields
+    if (!templateData.name || templateData.name.trim().length === 0) {
+      res.status(400).json({ 
+        success: false, 
+        error: 'Template name is required' 
+      });
+      return;
+    }
+
+    if (!templateData.prompt || templateData.prompt.trim().length === 0) {
+      res.status(400).json({ 
+        success: false, 
+        error: 'Template prompt is required' 
+      });
+      return;
+    }
+
+    const template = await documentService.createTemplate(templateData);
+    res.status(201).json({ success: true, template });
+    
+  } catch (error) {
+    console.error('Error creating template:', error);
+    res.status(400).json({ 
+      success: false, 
+      error: 'Failed to create template', 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    });
+  }
+});
+
+// PUT /api/templates/:id - Update an existing template
+router.put('/:id', async (req: Request, res: Response) => {
+  try {
+    const documentService = databaseServiceFactory.getDocumentService();
+    if (!documentService) {
+      res.status(503).json({ 
+        success: false, 
+        error: 'DocumentService not available. Check server initialization.' 
+      });
+      return;
+    }
+
+    const { id } = req.params;
+    const updates = req.body;
+
+    // Don't allow ID changes
+    if (updates.id && updates.id !== id) {
+      res.status(400).json({ 
+        success: false, 
+        error: 'Cannot change template ID' 
+      });
+      return;
+    }
+
+    const template = await documentService.updateTemplate(id, updates);
+    res.json({ success: true, template });
+    
+  } catch (error) {
+    console.error('Error updating template:', error);
+    if (error instanceof Error && error.message.includes('not found')) {
+      res.status(404).json({ 
+        success: false, 
+        error: error.message 
+      });
+    } else {
+      res.status(400).json({ 
+        success: false, 
+        error: 'Failed to update template', 
+        details: error instanceof Error ? error.message : 'Unknown error' 
+      });
+    }
+  }
+});
+
+// DELETE /api/templates/:id - Delete a template
+router.delete('/:id', async (req: Request, res: Response) => {
+  try {
+    const documentService = databaseServiceFactory.getDocumentService();
+    if (!documentService) {
+      res.status(503).json({ 
+        success: false, 
+        error: 'DocumentService not available. Check server initialization.' 
+      });
+      return;
+    }
+
+    const { id } = req.params;
+    
+    await documentService.deleteTemplate(id);
+    res.json({ success: true, message: `Template '${id}' deleted successfully` });
+    
+  } catch (error) {
+    console.error('Error deleting template:', error);
+    if (error instanceof Error && error.message.includes('not found')) {
+      res.status(404).json({ 
+        success: false, 
+        error: error.message 
+      });
+    } else {
+      res.status(500).json({ 
+        success: false, 
+        error: 'Failed to delete template', 
+        details: error instanceof Error ? error.message : 'Unknown error' 
+      });
+    }
+  }
+});
 
 // GET /api/templates - List all templates
 router.get('/', async (_req: Request, res: Response) => {
   try {
-    const templates: Template[] = getAllTemplates();
+    const templates: Template[] = await getAllTemplates();
     res.json({ success: true, templates, count: templates.length });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to load available templates', details: error instanceof Error ? error.message : 'Unknown error' });
@@ -25,8 +150,7 @@ router.get('/search', async (req: Request, res: Response) => {
         error: 'Search term is required. Use /search?q=term.' 
       });
       return;
-    }
-    const templates = searchTemplates(searchTerm);
+    }    const templates = await searchTemplates(searchTerm);
     res.json({ 
       success: true, 
       templates, 
@@ -53,8 +177,7 @@ router.get('/search/:term', async (req: Request, res: Response) => {
         error: 'Search term is required. Use /search/:term.' 
       });
       return;
-    }
-    const templates = searchTemplates(searchTerm);
+    }    const templates = await searchTemplates(searchTerm);
     res.json({ 
       success: true, 
       templates, 
@@ -74,8 +197,7 @@ router.get('/search/:term', async (req: Request, res: Response) => {
 // GET /api/templates/model/:modelType - Filter templates by model type (new database feature)
 router.get('/model/:modelType', async (req: Request, res: Response) => {
   try {
-    const modelType = req.params.modelType;
-    const templates = getTemplatesByModel(modelType);
+    const modelType = req.params.modelType;    const templates = await getTemplatesByModel(modelType);
     res.json({ 
       success: true, 
       templates, 
@@ -118,7 +240,7 @@ router.get('/:id', async (req: Request, res: Response) => {
       return;
     }
     
-    const template = getTemplateById(id);
+    const template = await getTemplateById(id);
     if (!template) {
       res.status(404).json({ success: false, error: 'Template not found' });
       return;

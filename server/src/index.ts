@@ -178,13 +178,29 @@ async function startServer() {
       fallbackToFiles: true, // Fallback to files if database fails
       dbPath: process.env.DATABASE_PATH // Allow custom database path
     });
-    
-    // Initialize database service
+      // Initialize database service
     console.log('🔧 Initializing database service...');
-    await databaseServiceFactory.initializeDatabase();
+    
+    // Check for seed data mode environment variable
+    const USE_SEED_DATA_MODE = process.env.USE_SEED_DATA_MODE === 'true';
+    
+    if (USE_SEED_DATA_MODE) {
+      console.log('🌱 Using seed data mode (no file watchers)');
+      await databaseServiceFactory.initializeDatabaseWithSeedData();
+    } else {
+      console.log('👀 Using file watching mode (current default)');
+      await databaseServiceFactory.initializeDatabase();
+    }
     
     if (databaseServiceFactory.isDatabaseReady()) {
-      console.log('✅ Database service ready - using database storage');
+      const modeStr = USE_SEED_DATA_MODE ? 'seed data mode' : 'file watching mode';
+      console.log(`✅ Database service ready - using database storage (${modeStr})`);
+      
+      // Log DocumentService availability
+      const docService = databaseServiceFactory.getDocumentService();
+      if (docService) {
+        console.log('📋 DocumentService available - CRUD operations enabled');
+      }
     } else {
       console.log('⚠️  Database service failed - using file-based fallback');
       const error = databaseServiceFactory.getInitializationError();

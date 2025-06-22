@@ -50,12 +50,50 @@ resource "azurerm_application_insights" "ai" {
   application_type    = "web"
 }
 
+# Storage Account for persistent database storage
+resource "random_string" "storage_suffix" {
+  length  = 6
+  upper   = false
+  special = false
+}
+
+resource "azurerm_storage_account" "voice_ai_storage" {
+  name                     = "${var.environment_name}st${random_string.storage_suffix.result}"
+  resource_group_name      = azurerm_resource_group.main.name
+  location                 = azurerm_resource_group.main.location
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+  
+  tags = {
+    Environment = var.environment_name
+    Purpose     = "SQLite Database Storage"
+  }
+}
+
+resource "azurerm_storage_share" "database_share" {
+  name                 = "database"
+  storage_account_name = azurerm_storage_account.voice_ai_storage.name
+  quota                = var.database_storage_quota_gb
+  
+  depends_on = [azurerm_storage_account.voice_ai_storage]
+}
+
 # Container Apps Environment
 resource "azurerm_container_app_environment" "cae" {
   name                       = "${var.environment_name}cae"
   location                   = var.location
   resource_group_name        = azurerm_resource_group.main.name
   log_analytics_workspace_id = azurerm_log_analytics_workspace.log.id
+}
+
+# Container App Environment Storage for SQLite database
+resource "azurerm_container_app_environment_storage" "database_storage" {
+  name                         = "database-storage"
+  container_app_environment_id = azurerm_container_app_environment.cae.id
+  account_name                 = azurerm_storage_account.voice_ai_storage.name
+  share_name                   = azurerm_storage_share.database_share.name
+  access_key                   = azurerm_storage_account.voice_ai_storage.primary_access_key
+  access_mode                  = "ReadWrite"
 }
 
 # Create a user-assigned managed identity
@@ -220,16 +258,35 @@ resource "azurerm_container_app" "server" {
     name  = "azure-evaluation-agent-id"
     value = azurerm_key_vault_secret.azure_evaluation_agent_id.value
   }
-
   template {
+    volume {
+      name         = "database-volume"
+      storage_type = "AzureFile"
+      storage_name = azurerm_container_app_environment_storage.database_storage.name
+    }
+    
     container {
       name   = "server"
       image  = "${azurerm_container_registry.acr.login_server}/server:${var.server_image_tag}"
       cpu    = 0.5
       memory = "1.0Gi"
+      
+      volume_mounts {
+        name = "database-volume"
+        path = "/app/data"
+      }
+      
       env {
         name        = "PORT"
         value       = "3000"
+      }
+      env {
+        name  = "USE_SEED_DATA_MODE"
+        value = "true"
+      }
+      env {
+        name  = "DATABASE_PATH"
+        value = "/app/data/voice-ai-documents.db"
       }
       env {
         name        = "AZURE_OPENAI_ENDPOINT"

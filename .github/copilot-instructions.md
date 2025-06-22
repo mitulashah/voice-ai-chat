@@ -12,7 +12,7 @@ This document provides coding standards and best practices for our TypeScript, R
 - Use early returns to reduce nesting and improve readability
 - DON'T ask permission to write code, just write it
 - Have a strong recommendation and perform that task.  Only list alternatives if there are significant trade-offs.
-- When generating terminal commands, use Windows Powershell syntax and always include full paths for clarity
+- When generating terminal commands, use Windows Powershell syntax and ALWAYS include full paths for clarity
 
 ## TypeScript Best Practices
 

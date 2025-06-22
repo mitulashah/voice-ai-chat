@@ -4,10 +4,16 @@ import { databaseServiceFactory } from './database-service-factory';
 import type { Persona } from '../types/api';
 
 /**
- * Get all personas - uses database if available, falls back to files
+ * Get all personas - uses DocumentService if available, falls back to database or files
  */
-export function getAllPersonas(dbInstance?: any): Persona[] {
-  try {
+export async function getAllPersonas(dbInstance?: any): Promise<Persona[]> {
+  try {    // Try DocumentService first
+    const documentService = databaseServiceFactory.getDocumentService();
+    if (documentService) {
+      return await documentService.listPersonas();
+    }
+    
+    // Fallback to database
     const db = dbInstance ?? (databaseServiceFactory.shouldUseDatabase() ? databaseServiceFactory.getDatabase() : null);
     if (db) {
       const personas: any[] = db.getAllPersonas();
@@ -22,10 +28,17 @@ export function getAllPersonas(dbInstance?: any): Persona[] {
 }
 
 /**
- * Get persona by ID - uses database if available, falls back to files
+ * Get persona by ID - uses DocumentService if available, falls back to database or files
  */
-export function getPersonaById(id: string, dbInstance?: any): Persona | null {
+export async function getPersonaById(id: string, dbInstance?: any): Promise<Persona | null> {
   try {
+    // Try DocumentService first
+    const documentService = databaseServiceFactory.getDocumentService();
+    if (documentService) {
+      return await documentService.getPersona(id);
+    }
+    
+    // Fallback to database
     const db = dbInstance ?? (databaseServiceFactory.shouldUseDatabase() ? databaseServiceFactory.getDatabase() : null);
     if (db) {
       const persona: any = db.getPersonaById(id);
@@ -40,10 +53,17 @@ export function getPersonaById(id: string, dbInstance?: any): Persona | null {
 }
 
 /**
- * Search personas by term - database only feature with file fallback
+ * Search personas by term - uses DocumentService if available, falls back to database or files
  */
-export function searchPersonas(searchTerm: string, dbInstance?: any): Persona[] {
+export async function searchPersonas(searchTerm: string, dbInstance?: any): Promise<Persona[]> {
   try {
+    // Try DocumentService first
+    const documentService = databaseServiceFactory.getDocumentService();
+    if (documentService) {
+      return await documentService.searchPersonas(searchTerm);
+    }
+    
+    // Fallback to database
     const db = dbInstance ?? (databaseServiceFactory.shouldUseDatabase() ? databaseServiceFactory.getDatabase() : null);
     if (db) {
       const results: any[] = db.searchDocuments('persona', searchTerm);
@@ -59,10 +79,20 @@ export function searchPersonas(searchTerm: string, dbInstance?: any): Persona[] 
 }
 
 /**
- * Get personas by age group - database feature with file fallback
+ * Get personas by age group - uses DocumentService if available, falls back to database or files
  */
-export function getPersonasByAgeGroup(ageGroup: string, dbInstance?: any): Persona[] {
+export async function getPersonasByAgeGroup(ageGroup: string, dbInstance?: any): Promise<Persona[]> {
   try {
+    // Try DocumentService first
+    const documentService = databaseServiceFactory.getDocumentService();
+    if (documentService) {
+      const allPersonas = await documentService.listPersonas();
+      return allPersonas.filter((persona: any) => 
+        persona.demographics?.ageGroup?.toLowerCase().includes(ageGroup.toLowerCase())
+      );
+    }
+    
+    // Fallback to database
     const db = dbInstance ?? (databaseServiceFactory.shouldUseDatabase() ? databaseServiceFactory.getDatabase() : null);
     if (db && 'getPersonasByAgeGroup' in db) {
       const results: any[] = (db as any).getPersonasByAgeGroup(ageGroup);

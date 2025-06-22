@@ -88,3 +88,9 @@ variable "vite_api_url" {
   type        = string
   default     = ""
 }
+
+variable "database_storage_quota_gb" {
+  description = "Storage quota in GB for the SQLite database file share."
+  type        = number
+  default     = 5
+}

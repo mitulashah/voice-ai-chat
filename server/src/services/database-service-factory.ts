@@ -1,5 +1,6 @@
 import { FileSyncDatabase } from '../database/file-sync-database';
 import { DocumentDatabase } from '../database/document-database';
+import { DocumentService } from './DocumentService';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -18,6 +19,7 @@ export interface DatabaseServiceConfig {
 export class DatabaseServiceFactory {
   private static instance: DatabaseServiceFactory;
   private database: FileSyncDatabase | DocumentDatabase | null = null;
+  private documentService: DocumentService | null = null;
   private config: DatabaseServiceConfig;
   private initializationPromise: Promise<void> | null = null;
   private initializationError: Error | null = null;
@@ -92,10 +94,14 @@ export class DatabaseServiceFactory {
       while (!this.database.isReady() && retries < 100) {
         await new Promise(resolve => setTimeout(resolve, 100));
         retries++;
+      }      if (!this.database.isReady()) {
+        throw new Error('Database failed to initialize within timeout');
       }
 
-      if (!this.database.isReady()) {
-        throw new Error('Database failed to initialize within timeout');
+      // Initialize DocumentService if we have a DocumentDatabase
+      if (this.database instanceof DocumentDatabase) {
+        this.documentService = new DocumentService(this.database);
+        console.log('📋 DocumentService initialized successfully');
       }
 
       console.log('✅ Database service initialized successfully');
@@ -113,8 +119,63 @@ export class DatabaseServiceFactory {
     }
   }
 
+  public async initializeDatabaseWithSeedData(): Promise<void> {
+    if (this.initializationPromise) {
+      return this.initializationPromise;
+    }
+
+    this.initializationPromise = this._initializeWithSeedData();
+    return this.initializationPromise;
+  }
+
+  private async _initializeWithSeedData(): Promise<void> {
+    try {
+      console.log('🗃️  Initializing database with seed data approach...');
+      
+      // Always use DocumentDatabase (no file watchers)
+      const dbPath = this.config.dbPath || path.join(process.cwd(), 'data', 'voice-ai-documents.db');
+      const docDatabase = new DocumentDatabase(dbPath);
+      
+      // Check if database is empty (needs seeding)
+      const stats = docDatabase.getDocumentStats();
+      const isEmpty = stats.total === 0;
+      
+      if (isEmpty) {
+        console.log('📁 Database is empty, seeding from files...');
+        const { DatabaseMigration } = await import('../database/migration');
+        const migration = new DatabaseMigration(dbPath);
+        const result = await migration.migrateFromFiles();
+        
+        if (result.success) {
+          console.log(`✅ Seeded database: ${result.personasCount} personas, ${result.templatesCount} templates`);
+        } else {
+          console.warn(`⚠️  Seeding completed with ${result.errors.length} errors`);
+        }
+      } else {
+        console.log(`🗃️  Database already populated (${stats.total} documents), skipping seed`);
+      }
+        this.database = docDatabase;
+      
+      // Initialize DocumentService with the database
+      this.documentService = new DocumentService(docDatabase);
+      console.log('📋 DocumentService initialized successfully');
+      
+      console.log('✅ Database ready for CRUD operations');
+      
+    } catch (error) {
+      this.initializationError = error as Error;
+      console.error('❌ Database initialization failed:', error);
+      
+      // No fallback to files - pure database approach
+      throw error;
+    }
+  }
   public getDatabase(): FileSyncDatabase | DocumentDatabase | null {
     return this.database;
+  }
+
+  public getDocumentService(): DocumentService | null {
+    return this.documentService;
   }
 
   public isDatabaseReady(): boolean {
@@ -128,13 +189,13 @@ export class DatabaseServiceFactory {
   public getInitializationError(): Error | null {
     return this.initializationError;
   }
-
   public async close(): Promise<void> {
     if (this.database) {
       console.log('🛑 Closing database service...');
       this.database.close();
       this.database = null;
     }
+    this.documentService = null;
     this.initializationPromise = null;
     this.initializationError = null;
   }

@@ -9,11 +9,23 @@ import { Scenario } from '../types/api';
 // Note: DB instance must be retrieved at runtime after initialization
 
 export async function getAllScenarios(): Promise<Scenario[]> {
-  const db = databaseServiceFactory.getDatabase();
-  if (!(db instanceof FileSyncDatabase)) {
-    throw new Error('Database not initialized or not a FileSyncDatabase');
+  try {
+    // Try DocumentService first
+    const documentService = databaseServiceFactory.getDocumentService();
+    if (documentService) {
+      return await documentService.listScenarios();
+    }
+    
+    // Fallback to database
+    const db = databaseServiceFactory.getDatabase();
+    if (!(db instanceof FileSyncDatabase)) {
+      throw new Error('Database not initialized or not a FileSyncDatabase');
+    }
+    return db.getAllScenarios();
+  } catch (error) {
+    console.error('Error getting scenarios:', error);
+    throw error;
   }
-  return db.getAllScenarios();
 }
 
 /**
@@ -87,9 +99,23 @@ export function formatScenarioForTemplate(scenario: Scenario): Record<string, st
 }
 
 export async function getScenarioById(id: string): Promise<Scenario | null> {
-  const db = databaseServiceFactory.getDatabase();
-  if (!(db instanceof FileSyncDatabase)) {
-    throw new Error('Database not initialized or not a FileSyncDatabase');
+  try {
+    // Try DocumentService first
+    const documentService = databaseServiceFactory.getDocumentService();
+    if (documentService) {
+      return await documentService.getScenario(id);
+    }
+    
+    // Fallback to database
+    const db = databaseServiceFactory.getDatabase();
+    if (!(db instanceof FileSyncDatabase)) {
+      throw new Error('Database not initialized or not a FileSyncDatabase');
+    }
+    
+    const scenarios = await db.getAllScenarios();
+    return scenarios.find(s => s.id === id) || null;
+  } catch (error) {
+    console.error('Error getting scenario by ID:', error);
+    throw error;
   }
-  return db.getScenarioById(id);
 }

@@ -5,10 +5,17 @@ import { databaseServiceFactory } from './database-service-factory';
 import type { Template } from '../types/api';
 
 /**
- * Get all templates - uses database if available, falls back to files
+ * Get all templates - uses DocumentService if available, falls back to database or files
  */
-export function getAllTemplates(dbInstance?: any): Template[] {
+export async function getAllTemplates(dbInstance?: any): Promise<Template[]> {
   try {
+    // Try DocumentService first
+    const documentService = databaseServiceFactory.getDocumentService();
+    if (documentService) {
+      return await documentService.listTemplates();
+    }
+    
+    // Fallback to database
     const db = dbInstance ?? (databaseServiceFactory.shouldUseDatabase() ? databaseServiceFactory.getDatabase() : null);
     if (db) {
       const templates: any[] = db.getAllTemplates();
@@ -33,10 +40,17 @@ export function getAllTemplates(dbInstance?: any): Template[] {
 }
 
 /**
- * Get template by ID - uses database if available, falls back to files
+ * Get template by ID - uses DocumentService if available, falls back to database or files
  */
-export function getTemplateById(id: string, dbInstance?: any): Template | null {
+export async function getTemplateById(id: string, dbInstance?: any): Promise<Template | null> {
   try {
+    // Try DocumentService first
+    const documentService = databaseServiceFactory.getDocumentService();
+    if (documentService) {
+      return await documentService.getTemplate(id);
+    }
+    
+    // Fallback to database
     const db = dbInstance ?? (databaseServiceFactory.shouldUseDatabase() ? databaseServiceFactory.getDatabase() : null);
     if (db) {
       const template: any = db.getTemplateById(id);
@@ -58,10 +72,17 @@ export function getTemplateById(id: string, dbInstance?: any): Template | null {
 }
 
 /**
- * Search templates by term - database only feature with file fallback
+ * Search templates by term - uses DocumentService if available, falls back to database or files
  */
-export function searchTemplates(searchTerm: string, dbInstance?: any): Template[] {
+export async function searchTemplates(searchTerm: string, dbInstance?: any): Promise<Template[]> {
   try {
+    // Try DocumentService first
+    const documentService = databaseServiceFactory.getDocumentService();
+    if (documentService) {
+      return await documentService.searchTemplates(searchTerm);
+    }
+    
+    // Fallback to database
     const db = dbInstance ?? (databaseServiceFactory.shouldUseDatabase() ? databaseServiceFactory.getDatabase() : null);
     if (db) {
       const results: any[] = db.searchDocuments('prompt_template', searchTerm);
@@ -84,10 +105,21 @@ export function searchTemplates(searchTerm: string, dbInstance?: any): Template[
 }
 
 /**
- * Get templates by model type - database feature with file fallback
+ * Get templates by model type - uses DocumentService if available, falls back to database or files
  */
-export function getTemplatesByModel(modelType: string, dbInstance?: any): Template[] {
+export async function getTemplatesByModel(modelType: string, dbInstance?: any): Promise<Template[]> {
   try {
+    // Try DocumentService first
+    const documentService = databaseServiceFactory.getDocumentService();
+    if (documentService) {
+      const allTemplates = await documentService.listTemplates();
+      return allTemplates.filter((template: any) => 
+        template.metadata?.model?.api?.toLowerCase().includes(modelType.toLowerCase()) ||
+        template.model?.api?.toLowerCase().includes(modelType.toLowerCase())
+      );
+    }
+    
+    // Fallback to database
     const db = dbInstance ?? (databaseServiceFactory.shouldUseDatabase() ? databaseServiceFactory.getDatabase() : null);
     if (db) {
       const allTemplates: any[] = db.getAllTemplates();
