@@ -62,12 +62,11 @@ const Login: React.FC = () => {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           margin="normal"
-        />
-        <Button
+        />        <Button
           variant="contained"
           fullWidth
           onClick={handleLogin}
-          sx={{ mt: 2 }}
+          sx={{ mt: 2, borderRadius: 2 }}
         >
           Login
         </Button>

@@ -25,9 +25,8 @@ export const markdownComponents = {
   ),
   ol: ({ children }: { children?: React.ReactNode }) => (
     <Box component="ol" sx={{ pl: 3, mb: 0.5 }}>{children}</Box>
-  ),
-  li: ({ children }: { children?: React.ReactNode }) => (
-    <li style={{ marginBottom: 2 }}>{children}</li>
+  ),  li: ({ children }: { children?: React.ReactNode }) => (
+    <Typography component="li" variant="body2" sx={{ mb: 0.25 }}>{children}</Typography>
   ),
   blockquote: ({ children }: { children?: React.ReactNode }) => (
     <Box component="blockquote" sx={{ borderLeft: '3px solid #90caf9', pl: 2, color: 'text.secondary', fontStyle: 'italic', my: 1 }}>{children}</Box>

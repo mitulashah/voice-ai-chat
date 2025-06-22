@@ -39,13 +39,22 @@ const MenuBar: React.FC = () => {
           <Typography variant="subtitle2" sx={{ ml: 1, fontWeight: 500, textAlign: 'left' }}>
             Scenarios
           </Typography>
-        </Box>
-        {isAuthenticated ? (
-          <Button variant="text" size="small" onClick={async () => { await logout(); navigate('/login'); }}>
+        </Box>        {isAuthenticated ? (
+          <Button 
+            variant="text" 
+            size="small" 
+            sx={{ borderRadius: 2 }}
+            onClick={async () => { await logout(); navigate('/login'); }}
+          >
             Logout
           </Button>
         ) : (
-          <Button variant="text" size="small" onClick={() => navigate('/login')}>
+          <Button 
+            variant="text" 
+            size="small" 
+            sx={{ borderRadius: 2 }}
+            onClick={() => navigate('/login')}
+          >
             Login
           </Button>
         )}
