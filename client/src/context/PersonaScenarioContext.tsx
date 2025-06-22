@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import axios from 'axios';
+import apiClient from '../utils/apiClient';
 import type { Persona, Scenario } from './persona-scenario-types';
 import { generateRandomName, inferGenderFromPersona, type GeneratedName } from '../utils/nameGenerator';
+import { useAuth } from './AuthContext';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL;
+
 
 interface PersonaScenarioContextData {
   personas: Persona[];
@@ -37,23 +38,29 @@ export const PersonaScenarioProvider: React.FC<{ children: React.ReactNode }> = 
   const [generatedName, setGeneratedName] = useState<GeneratedName | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
 
   useEffect(() => {
-    setLoading(true);
-    Promise.all([
-      axios.get<{ personas: Persona[] }>(`${API_BASE_URL}/api/personas`),
-      axios.get<{ scenarios: Scenario[] }>(`${API_BASE_URL}/api/scenarios`),
-    ])
-      .then(([personaRes, scenarioRes]) => {
-        setPersonas(personaRes.data.personas || []);
-        setScenarios(scenarioRes.data.scenarios || []);
-        setError(null);
-      })
-      .catch(() => {
-        setError('Failed to load personas or scenarios');
-      })
-      .finally(() => setLoading(false));
-  }, []);  // Generate a new name when persona changes
+    // Only fetch data when authenticated and not loading
+    if (isAuthenticated && !authLoading) {
+      setLoading(true);
+      Promise.all([
+        apiClient.get<{ personas: Persona[] }>('/api/personas'),
+        apiClient.get<{ scenarios: Scenario[] }>('/api/scenarios'),
+      ])
+        .then(([personaRes, scenarioRes]) => {
+          setPersonas(personaRes.data.personas || []);
+          setScenarios(scenarioRes.data.scenarios || []);
+          setError(null);
+        })
+        .catch(() => {
+          setError('Failed to load personas or scenarios');
+        })
+        .finally(() => setLoading(false));
+    }
+  }, [isAuthenticated, authLoading]);
+
+  // Generate a new name when persona changes
   useEffect(() => {
     if (selectedPersona) {
       // Try to infer gender from persona, or generate random

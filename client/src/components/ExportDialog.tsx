@@ -15,8 +15,7 @@ import ExportDialogActions from './ExportDialogActions';
 import ExportDialogSnackbar from './ExportDialogSnackbar';
 import jsPDF from 'jspdf';
 import { marked } from 'marked';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+import apiClient from '../utils/apiClient';
 
 interface ExportDialogProps {
   exportJson: string | null;
@@ -86,17 +85,23 @@ const ExportDialog: React.FC<ExportDialogProps> = ({ exportJson, onClose, onDown
     const conversationData = buildConversationData(exportData);
     if (!conversationData) return;
     await evaluateConversation(conversationData);
-  };
-
-  useEffect(() => {
+  };  useEffect(() => {
     if (!exportJson) return;
     const fetchStats = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/stats`);
-        const data = await res.json();
+        const response = await apiClient.get('/api/stats');
+        const data = response.data;
         setStats({ speechDurationSeconds: data.speechDurationSeconds, audioCharacterCount: data.audioCharacterCount });
-      } catch (e) {
+      } catch (e: any) {
         console.error('Failed to fetch stats:', e);
+        // If it's an authentication error, set stats to null to hide the statistics section
+        if (e.response?.status === 401) {
+          console.warn('Stats not available: user not authenticated');
+          setStats(null);
+        } else {
+          // For other errors, set default values to prevent crashes
+          setStats({ speechDurationSeconds: 0, audioCharacterCount: 0 });
+        }
       }
     };
     fetchStats();

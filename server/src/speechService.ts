@@ -1,10 +1,11 @@
-import * as sdk from 'microsoft-cognitiveservices-speech-sdk';
+// Use require for speech SDK (no type declarations available)
+const sdk: any = require('microsoft-cognitiveservices-speech-sdk');
 import * as fsExtra from 'fs-extra';
 import * as path from 'path';
 import statsService from './services/statsService';
 
 // Function to perform speech recognition
-async function performSpeechRecognition(wavFilePath: string): Promise<sdk.SpeechRecognitionResult> {
+async function performSpeechRecognition(wavFilePath: string): Promise<any> {
   console.log('Starting speech recognition for:', wavFilePath);
   console.log('Azure Speech Key:', process.env.AZURE_SPEECH_KEY ? `${process.env.AZURE_SPEECH_KEY.substring(0, 8)}...` : 'MISSING');
   console.log('Azure Speech Region:', process.env.AZURE_SPEECH_REGION || 'MISSING');
@@ -19,15 +20,15 @@ async function performSpeechRecognition(wavFilePath: string): Promise<sdk.Speech
   const recognizer = new sdk.SpeechRecognizer(speechConfig, audioConfig);
 
   try {
-    return await new Promise<sdk.SpeechRecognitionResult>((resolve, reject) => {
+    return await new Promise<any>((resolve, reject) => {
       let isCompleted = false;
 
       recognizer.recognizeOnceAsync(
-        result => {
+        (result: any) => {
           isCompleted = true;
           resolve(result);
         },
-        error => {
+        (error: any) => {
           if (!isCompleted) {
             reject(error);
           }

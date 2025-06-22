@@ -2,7 +2,8 @@ import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { config } from './config/env';
 import OpenAI from 'openai';
-import * as sdk from 'microsoft-cognitiveservices-speech-sdk';
+// Use require for speech SDK to bypass missing type declarations
+const sdk: any = require('microsoft-cognitiveservices-speech-sdk');
 import { errorHandler } from './middleware/errorHandler';
 import { databaseServiceFactory } from './services/database-service-factory';
 import personasRouter from './routes/personas';
@@ -14,14 +15,26 @@ import tokenRouter from './routes/token';
 import scenariosRouter from './routes/scenarios';
 import moodsRouter from './routes/moods';
 import { AgentEvaluationService, ConversationData, EvaluationProgress, EvaluationResult } from './services/agentEvaluationService';
+import cookieParser from 'cookie-parser';
+import { authMiddleware } from './middleware/authMiddleware';
+import { rateLimitMiddleware } from './middleware/rateLimitMiddleware';
+import authRouter from './routes/auth';
 
 const app: Express = express();
 const PORT = config.port;
 
 // Middleware
-app.use(cors());
+// Allow any origin (dev) and include credentials for cookies
+app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(cookieParser());
+
+// Log all incoming requests for debugging (can be removed in production)
+app.use((req, res, next) => {
+  console.log(`[HTTP] ${req.method} ${req.originalUrl}`);
+  next();
+});
 
 // Register personas router first
 app.use('/api/personas', personasRouter);
@@ -61,11 +74,19 @@ app.get('/api/health', (req: Request, res: Response) => {
   res.json({ status: 'ok', message: 'Server is running' });
 });
 
+// Register authentication routes (login/logout/status)
+app.use('/api/auth', authRouter);
+// Public speech token endpoint (no auth required)
+app.use('/api/speech/token', tokenRouter);
+
+// Apply authentication and rate limiting to all subsequent routes
+app.use(authMiddleware);
+app.use(rateLimitMiddleware);
+
 // Register routes
 app.use('/api/templates', templatesRouter);
 app.use('/api/chat', chatRouter);
 app.use('/api/speech', speechRouter);
-app.use('/api/speech/token', tokenRouter);
 app.use('/api/stats', statsRouter);
 app.use('/api/scenarios', scenariosRouter);
 app.use('/api/moods', moodsRouter);

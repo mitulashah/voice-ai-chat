@@ -2,6 +2,7 @@
 // This avoids conflicts and allows the hook to work in all browsers supporting the API.
 
 import { useRef, useState, useCallback } from 'react';
+import apiClient from '../utils/apiClient';
 
 export interface UseAudioRecorderResult {
   startRecording: () => void;
@@ -35,8 +36,6 @@ interface ISpeechRecognition {
   start(): void;
   stop(): void;
 }
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 /**
  * Custom hook for audio recording and speech duration estimation using Web Speech API.
@@ -74,9 +73,7 @@ export const useAudioRecorder = (): UseAudioRecorderResult => {
         // console.log('Speech result at', now);
         setTranscript(event.results[event.results.length - 1][0].transcript);
       }
-    };
-
-    recognition.onend = () => {
+    };    recognition.onend = () => {
       setIsRecording(false);
       // console.log('Recognition ended. First:', firstResultTime.current, 'Last:', lastResultTime.current);
       if (firstResultTime.current && lastResultTime.current) {
@@ -84,11 +81,8 @@ export const useAudioRecorder = (): UseAudioRecorderResult => {
         setSpeechDuration(durationMs);
         // console.log('Calculated durationMs:', durationMs);
         if (durationMs > 0) {
-          fetch(`${API_BASE_URL}/api/stats/speech-duration`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ seconds: durationMs / 1000 })
-          }).then(() => {/* posted speech duration */})
+          apiClient.post('/api/stats/speech-duration', { seconds: durationMs / 1000 })
+            .then(() => {/* posted speech duration */})
             .catch(() => {/* ignore errors for now */});
         } else {
           // console.log('Duration is zero, not posting');

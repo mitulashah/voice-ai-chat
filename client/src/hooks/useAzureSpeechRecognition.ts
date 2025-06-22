@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import * as SpeechSDK from 'microsoft-cognitiveservices-speech-sdk';
 import { fetchSpeechToken } from '../utils/speechApi';
+import apiClient from '../utils/apiClient';
 
 interface SpeechRecognitionState {
   isListening: boolean;
@@ -8,8 +9,6 @@ interface SpeechRecognitionState {
   startListening: () => Promise<void>;
   stopListening: () => void;
 }
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 export const useAzureSpeechRecognition = (onTranscript: (text: string) => void): SpeechRecognitionState => {
   const [isListening, setIsListening] = useState(false);
@@ -96,17 +95,13 @@ export const useAzureSpeechRecognition = (onTranscript: (text: string) => void):
       };
       recognizer.sessionStopped = () => {
         setIsListening(false);
-        // Mark session end
-        sessionEndTime.current = Date.now();
+        // Mark session end        sessionEndTime.current = Date.now();
         // Calculate and send duration
         if (sessionStartTime.current && sessionEndTime.current) {
           const durationMs = sessionEndTime.current - sessionStartTime.current;
           if (durationMs > 0) {
-            fetch(`${API_BASE_URL}/api/stats/speech-duration`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ seconds: durationMs / 1000 })
-            }).catch(() => {/* ignore errors for now */});
+            apiClient.post('/api/stats/speech-duration', { seconds: durationMs / 1000 })
+              .catch(() => {/* ignore errors for now */});
           }
         }
         cleanup();

@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import axios from 'axios';
+import apiClient from '../utils/apiClient';
 import type { Mood } from './mood-types';
+import { useAuth } from './AuthContext';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL;
+
 
 interface MoodContextData {
   moods: Mood[];
@@ -25,17 +26,21 @@ export const MoodProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [selectedMood, setSelectedMood] = useState<Mood | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
 
   useEffect(() => {
-    setLoading(true);
-    axios.get<{ moods: Mood[] }>(`${API_BASE_URL}/api/moods`)
-      .then(res => {
-        setMoods(res.data.moods || []);
-        setError(null);
-      })
-      .catch(() => setError('Failed to load moods'))
-      .finally(() => setLoading(false));
-  }, []);
+    // Only fetch moods when authenticated and not loading
+    if (isAuthenticated && !authLoading) {
+      setLoading(true);
+      apiClient.get<{ moods: Mood[] }>('/api/moods')
+        .then(res => {
+          setMoods(res.data.moods || []);
+          setError(null);
+        })
+        .catch(() => setError('Failed to load moods'))
+        .finally(() => setLoading(false));
+    }
+  }, [isAuthenticated, authLoading]);
 
   return (
     <MoodContext.Provider value={{ moods, selectedMood, setSelectedMood, loading, error }}>

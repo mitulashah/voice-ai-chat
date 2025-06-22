@@ -13,18 +13,19 @@ import {
 } from '@mui/material';
 import MenuBar from './MenuBar';
 import ChatHeader from './ChatHeader';
-import axios from 'axios';
 import MessageList from './MessageList';
 import VoiceInputBar from './VoiceInputBar';
 import ExportDialog from './ExportDialog';
 import { useTemplate } from '../context/TemplateContext';
 import { useChat } from '../context/ChatContext';
 import { useVoice } from '../context/VoiceContext';
+import { useAuth } from '../context/AuthContext';
 import { fetchSubstitutedSystemPrompt } from '../utils/speechApi';
 import { usePersonaScenario } from '../context/PersonaScenarioContext';
 import { useMood } from '../context/MoodContext';
 import type { ScenarioParameters, ChatRequest } from '../context/scenario-parameters';
 import type { EvaluationExportData } from '../context/chat-types';
+import apiClient from '../utils/apiClient';
 
 interface Message {
   role: 'user' | 'assistant' | 'system';
@@ -37,9 +38,8 @@ interface Message {
   };
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
-
 const ChatInterface: React.FC = () => {
+  const { isAuthenticated } = useAuth();
   const { currentTemplate } = useTemplate();
   const { messages, setMessages, totalTokens, setTotalTokens } = useChat();
   const { selectedVoice, setSelectedVoice } = useVoice();
@@ -74,11 +74,10 @@ const ChatInterface: React.FC = () => {
     setTotalTokens(0);
     localStorage.setItem('chatMessages', JSON.stringify([sysMsg]));    localStorage.removeItem('totalTokens');
   }, [currentTemplate, setMessages, setTotalTokens]);
-
   // Fetch and update system prompt from backend when scenario parameters change
   useEffect(() => {
-    // Only run if persona, mood, or voice is set
-    if (!selectedPersona && !selectedMood && !selectedVoice) return;    const parameters: ScenarioParameters = {
+    // Only run if authenticated and if persona, mood, or voice is set
+    if (!isAuthenticated || (!selectedPersona && !selectedMood && !selectedVoice)) return;const parameters: ScenarioParameters = {
       persona: selectedPersona?.id || '',
       mood: selectedMood?.mood || '',
       name: generatedName?.full || selectedPersona?.name || '',
@@ -106,7 +105,7 @@ const ChatInterface: React.FC = () => {
         }
         setTotalTokens(0);
         localStorage.removeItem('totalTokens');
-      });  }, [selectedPersona, selectedScenario, selectedMood, selectedVoice, generatedName, currentTemplate, setMessages, setTotalTokens]);  // Track timestamps and end conversation
+      });  }, [isAuthenticated, selectedPersona, selectedScenario, selectedMood, selectedVoice, generatedName, currentTemplate, setMessages, setTotalTokens]);  // Track timestamps and end conversation
   const handleEndConversation = async () => {
     if (messages.length === 0) return;
     const endTime = Date.now();
@@ -118,8 +117,8 @@ const ChatInterface: React.FC = () => {
       // Fetch server-side stats for comprehensive data
     let serverStats = null;
     try {
-      const response = await fetch(`${API_BASE_URL}/api/stats`);
-      serverStats = await response.json();
+      const { data } = await apiClient.get('/api/stats');
+      serverStats = data;
     } catch (error) {
       console.error('Failed to fetch server stats:', error);
     }
@@ -129,8 +128,7 @@ const ChatInterface: React.FC = () => {
     let evaluationAreas: string[] = [];
     if (selectedScenario?.id) {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/scenarios/${selectedScenario.id}`);
-        const data = await response.json();
+        const { data } = await apiClient.get(`/api/scenarios/${selectedScenario.id}`);
         if (data.success && data.scenario) {
           scenarioDetails = data.scenario;
           
@@ -325,7 +323,7 @@ const ChatInterface: React.FC = () => {
 
     try {
       const response = await executeWithRetry(
-        () => axios.post(`${API_BASE_URL}/api/chat`, {
+        () => apiClient.post('/api/chat', {
           // Send the full messages thread for context
           messages: updatedMessages.map(({ role, content }) => ({ role, content })),
           parameters,
@@ -585,47 +583,31 @@ const ChatInterface: React.FC = () => {
         onClose={async () => {
           setExportJson(null);
           try {
-            await fetch(`${API_BASE_URL}/api/stats/reset`, { method: 'POST' });
+            await apiClient.post('/api/stats/reset');
           } catch (e) {
-            // Optionally handle error
             console.error('Failed to reset stats:', e);
           }
-        }}        onDownload={(json) => {
-          const exportData = JSON.parse(json);
-          
-          // Create a descriptive filename
-          const timestamp = new Date().toISOString().slice(0, 16).replace(/[-:]/g, '').replace('T', '_');
+        }}
+        onDownload={(json) => {
+           const timestamp = new Date()
+             .toISOString()
+             .slice(0, 16)
+             .replace(/[-:]/g, '')
+             .replace('T', '_');
           let filename = `conversation_${timestamp}`;
-          
-          // Add context to filename if available
-          if (exportData.context) {
-            const parts = [];
-            if (exportData.context.persona?.name) {
-              parts.push(exportData.context.persona.name.toLowerCase().replace(/\s+/g, '-'));
-            }
-            if (exportData.context.scenario?.name) {
-              parts.push(exportData.context.scenario.name.toLowerCase().replace(/\s+/g, '-'));
-            }
-            if (exportData.context.mood?.mood) {
-              parts.push(exportData.context.mood.mood.toLowerCase().replace(/\s+/g, '-'));
-            }
-            if (parts.length > 0) {
-              filename = `evaluation_${parts.join('_')}_${timestamp}`;
-            }
+          if (selectedScenario?.name) {
+            filename += `_${selectedScenario.name.replace(/\s/g, '_')}`;
           }
-          
           const blob = new Blob([json], { type: 'application/json' });
-          const url = URL.createObjectURL(blob);
           const link = document.createElement('a');
-          link.href = url;
+          link.href = URL.createObjectURL(blob);
           link.download = `${filename}.json`;
           link.click();
-          URL.revokeObjectURL(url);
-          setExportJson(null);
+          URL.revokeObjectURL(link.href);
         }}
       />
     </Container>
   );
-};
+}
 
 export default ChatInterface;

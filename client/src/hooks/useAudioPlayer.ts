@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef } from 'react';
+import apiClient from '../utils/apiClient';
 
 interface AudioPlayerState {
   isPlaying: boolean;
@@ -6,8 +7,6 @@ interface AudioPlayerState {
   playAudio: (text: string, id: string, voiceGender?: string) => Promise<void>;
   stopAudio: () => void;
 }
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 export const useAudioPlayer = (): AudioPlayerState => {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -29,16 +28,12 @@ export const useAudioPlayer = (): AudioPlayerState => {
         voiceName = voice;
       } else if (voice === 'male' || voice === 'female') {
         voiceGender = voice;
-      }
-
-      // Fetch the full MP3 audio as a blob
-      const response = await fetch(`${API_BASE_URL}/api/speech/synthesize`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, voiceGender, voiceName })
-      });
-      if (!response.ok) throw new Error('Failed to fetch audio');
-      const audioBlob = await response.blob();
+      }      // Fetch the full MP3 audio as a blob
+      const response = await apiClient.post('/api/speech/synthesize', 
+        { text, voiceGender, voiceName },
+        { responseType: 'blob' }
+      );
+      const audioBlob = response.data;
       console.debug('Fetched audio blob:', audioBlob, 'size:', audioBlob.size, 'type:', audioBlob.type);
       const audioUrl = URL.createObjectURL(audioBlob);
       const audio = new Audio(audioUrl);

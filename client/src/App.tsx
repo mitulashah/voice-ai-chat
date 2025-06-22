@@ -1,9 +1,13 @@
-import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
+import { ThemeProvider, createTheme, CssBaseline, Box, CircularProgress, Typography } from '@mui/material';
 import ChatInterface from './components/ChatInterface';
+import Login from './components/Login';
+import PrivateRoute from './components/PrivateRoute';
 import TemplateProvider from './context/TemplateContextProvider';
 import ChatProvider from './context/ChatContextProvider';
 import { VoiceProvider } from './context/VoiceContext';
 import { EvaluationProvider } from './context/EvaluationContext';
+import { Routes, Route } from 'react-router-dom';
+import { useAuth } from './context/AuthContext';
 
 // Create a Spectrum-inspired theme
 const theme = createTheme({
@@ -115,6 +119,32 @@ const theme = createTheme({
 });
 
 function App() {
+  const { isLoading } = useAuth();
+
+  // Show loading screen while checking authentication
+  if (isLoading) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'center',
+            alignItems: 'center',
+            height: '100vh',
+            bgcolor: 'background.default',
+          }}
+        >
+          <CircularProgress size={60} sx={{ mb: 2 }} />
+          <Typography variant="h6" color="text.secondary">
+            Loading...
+          </Typography>
+        </Box>
+      </ThemeProvider>
+    );
+  }
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
@@ -122,7 +152,17 @@ function App() {
         <TemplateProvider>
           <ChatProvider>
             <EvaluationProvider>
-              <ChatInterface />
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route
+                  path="/"
+                  element={
+                    <PrivateRoute>
+                      <ChatInterface />
+                    </PrivateRoute>
+                  }
+                />
+              </Routes>
             </EvaluationProvider>
           </ChatProvider>
         </TemplateProvider>

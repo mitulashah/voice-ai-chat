@@ -61,13 +61,12 @@ export const EvaluationProvider: React.FC<EvaluationProviderProps> = ({ children
         stage: 'analyzing',
         message: 'Analyzing conversation with Azure AI Agent...',
         percentage: 25
-      });
-
-      const response = await fetch(`${API_BASE_URL}/api/evaluation/analyze-simple`, {
+      });      const response = await fetch(`${API_BASE_URL}/api/evaluation/analyze-simple`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify(conversationData),
       });
 
@@ -120,10 +119,11 @@ export const EvaluationProvider: React.FC<EvaluationProviderProps> = ({ children
       setIsEvaluating(false);
     }
   }, []);
-
   const testConnection = useCallback(async (): Promise<boolean> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/evaluation/test`);
+      const response = await fetch(`${API_BASE_URL}/api/evaluation/test`, {
+        credentials: 'include'
+      });
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);

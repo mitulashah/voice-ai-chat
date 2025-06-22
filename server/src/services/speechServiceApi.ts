@@ -1,4 +1,5 @@
-import * as sdk from 'microsoft-cognitiveservices-speech-sdk';
+// Use require for speech SDK to bypass missing type declarations
+const sdk: any = require('microsoft-cognitiveservices-speech-sdk');
 import { processAudioForSpeechRecognition } from '../speechService';
 import { generateSpeech } from './speechUtil';
 import { config } from '../config/env';
@@ -50,10 +51,10 @@ export async function synthesizeSpeechStream(text: string, voiceGender: 'male' |
   let responseEnded = false;
   synthesizer.speakSsmlAsync(
     ssml,
-    result => {
+    (result: any) => {
       synthesizer.close();
     },
-    error => {
+    (error: any) => {
       synthesizer.close();
       if (!responseEnded) {
         responseEnded = true;

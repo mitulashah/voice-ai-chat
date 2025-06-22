@@ -201,11 +201,11 @@ const SpeechDiagnostics: React.FC = () => {
       });
     }    // Test 5: Test speech recognition endpoint directly
     addResult({ test: 'Speech Recognition Endpoint', status: 'pending', message: 'Testing speech recognition endpoint...' });
-    try {
-      // Send empty audio data to test the endpoint structure (should fail gracefully)
+    try {      // Send empty audio data to test the endpoint structure (should fail gracefully)
       const response = await fetch(`${API_BASE_URL}/api/speech/recognize`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ audioData: '' })
       });
       

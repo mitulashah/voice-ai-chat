@@ -67,12 +67,11 @@ const ExportDialogStatistics: React.FC<StatisticsProps> = ({ expanded, onChange,
             <Typography variant="caption" color="textSecondary" sx={{ fontSize: '0.7rem' }}>
               Avg/Msg
             </Typography>
-          </Box>
-          {stats && (
+          </Box>          {stats && (
             <>
               <Box textAlign="center" sx={{ flex: 1 }}>
                 <Typography variant="h6" color="info.main" fontWeight="bold" sx={{ fontSize: '1.1rem' }}>
-                  {stats.speechDurationSeconds.toFixed(2)} s
+                  {(stats.speechDurationSeconds ?? 0).toFixed(2)} s
                 </Typography>
                 <Typography variant="caption" color="textSecondary" sx={{ fontSize: '0.7rem' }}>
                   Speech Secs
@@ -80,7 +79,7 @@ const ExportDialogStatistics: React.FC<StatisticsProps> = ({ expanded, onChange,
               </Box>
               <Box textAlign="center" sx={{ flex: 1 }}>
                 <Typography variant="h6" color="info.dark" fontWeight="bold" sx={{ fontSize: '1.1rem' }}>
-                  {stats.audioCharacterCount.toLocaleString()}
+                  {(stats.audioCharacterCount ?? 0).toLocaleString()}
                 </Typography>
                 <Typography variant="caption" color="textSecondary" sx={{ fontSize: '0.7rem' }}>
                   Audio Chars

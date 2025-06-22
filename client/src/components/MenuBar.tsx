@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
-import { Box, IconButton, Collapse, Typography, useTheme } from '@mui/material';
+import { Box, IconButton, Collapse, Typography, useTheme, Button } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import { useTemplate } from '../context/TemplateContext';
 import { usePersonaScenario } from '../context/PersonaScenarioContext';
 import { useMood } from '../context/MoodContext';
 import { useVoice } from '../context/VoiceContext';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import type { Template } from '../context/template-types';
 
 const MenuBar: React.FC = () => {
   const [open, setOpen] = useState(false);
+  const { isAuthenticated, logout } = useAuth();
+  const navigate = useNavigate();
   const { templates, setCurrentTemplate, currentTemplate } = useTemplate();  const { personas, scenarios, selectedPersona, setSelectedPersona, selectedScenario, setSelectedScenario } = usePersonaScenario();
   const { moods, selectedMood, setSelectedMood } = useMood();
   const theme = useTheme();
@@ -26,13 +30,26 @@ const MenuBar: React.FC = () => {
 
   return (
     <Box sx={{ width: '100%', m: 0, p: 0 }}>
-      {/* Header row for triggering the template menu */}
-      <Box sx={{ display: 'flex', alignItems: 'center', p: 0.5, pt: 0.25, pb: 0.25, bgcolor: theme.palette.background.default, m: 0 }}>
-        <IconButton aria-label="open menu" onClick={handleToggle} size="small" sx={{ m: 0, p: 0.5 }}>
-          <MenuIcon fontSize="small" />
-        </IconButton>
-        <Typography variant="subtitle2" sx={{ ml: 1, fontWeight: 500 }}>Scenarios</Typography>
-      </Box>
+      {/* Header row with login/logout */}
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 0.5, pt: 0.25, pb: 0.25, bgcolor: theme.palette.background.default, m: 0 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <IconButton aria-label="open menu" onClick={handleToggle} size="small" sx={{ m: 0, p: 0.5 }}>
+            <MenuIcon fontSize="small" />
+          </IconButton>
+          <Typography variant="subtitle2" sx={{ ml: 1, fontWeight: 500, textAlign: 'left' }}>
+            Scenarios
+          </Typography>
+        </Box>
+        {isAuthenticated ? (
+          <Button variant="text" size="small" onClick={async () => { await logout(); navigate('/login'); }}>
+            Logout
+          </Button>
+        ) : (
+          <Button variant="text" size="small" onClick={() => navigate('/login')}>
+            Login
+          </Button>
+        )}
+       </Box>
       <Collapse in={open} timeout="auto" unmountOnExit>
         <Box sx={{ px: 0.5, pb: 0.5, pt: 0.25, width: '100%', bgcolor: 'transparent', borderBottom: `1px solid ${theme.palette.divider}`, mt: 1.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
           {/* Main content in a row */}

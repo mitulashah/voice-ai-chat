@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import apiClient from '../utils/apiClient';
 import type { Template } from './template-types';
 import { TemplateContext } from './template-context';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL;
+import { useAuth } from './AuthContext';
 
 interface TemplateProviderProps {
   children: React.ReactNode;
@@ -12,12 +11,16 @@ interface TemplateProviderProps {
 const TemplateProvider: React.FC<TemplateProviderProps> = ({ children }) => {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [currentTemplate, setCurrentTemplate] = useState<Template | null>(null);
+  const { isAuthenticated, isLoading } = useAuth();
 
   useEffect(() => {
-    axios.get<{ success: boolean; templates: Template[]; count: number }>(`${API_BASE_URL}/api/templates`)
-      .then(res => setTemplates(res.data.templates || []))
-      .catch(err => console.error('Failed to load templates:', err));
-  }, []);
+    // Only fetch templates if authenticated and not loading
+    if (isAuthenticated && !isLoading) {
+      apiClient.get<{ success: boolean; templates: Template[]; count: number }>('/api/templates')
+        .then(res => setTemplates(res.data.templates || []))
+        .catch(err => console.error('Failed to load templates:', err));
+    }
+  }, [isAuthenticated, isLoading]);
 
   useEffect(() => {
     if (templates.length > 0 && currentTemplate === null) {
