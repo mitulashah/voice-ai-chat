@@ -15,11 +15,10 @@ export const useAzureSpeechRecognition = (onTranscript: (text: string) => void):
   const [error, setError] = useState<string | null>(null);
   const [speechToken, setSpeechToken] = useState<string | null>(null);
   const [speechRegion, setSpeechRegion] = useState<string | null>(null);
-  const recognizerRef = useRef<SpeechSDK.SpeechRecognizer | null>(null);
-  const stopTimeoutRef = useRef<number | null>(null);
-  // Track start and end time for speech duration
-  const sessionStartTime = useRef<number | null>(null);
-  const sessionEndTime = useRef<number | null>(null);
+  const recognizerRef = useRef<SpeechSDK.SpeechRecognizer | null>(null);  const stopTimeoutRef = useRef<number | null>(null);
+  // Track actual speech duration (not session duration)
+  const speechStartTime = useRef<number | null>(null);
+  const totalSpeechDuration = useRef<number>(0);
 
   const cleanup = useCallback(() => {
     if (stopTimeoutRef.current) {
@@ -76,11 +75,10 @@ export const useAzureSpeechRecognition = (onTranscript: (text: string) => void):
       
       const recognizer = new SpeechSDK.SpeechRecognizer(speechConfig, audioConfig);
       recognizerRef.current = recognizer;
-      
-      setIsListening(true);
-      // Mark session start
-      sessionStartTime.current = Date.now();
-      sessionEndTime.current = null;
+        setIsListening(true);
+      // Reset speech duration tracking for this session
+      totalSpeechDuration.current = 0;
+      speechStartTime.current = null;
 
       recognizer.recognizing = () => {
         // Partial results (optional: can be used for live UI feedback)
@@ -92,25 +90,25 @@ export const useAzureSpeechRecognition = (onTranscript: (text: string) => void):
       };
       recognizer.sessionStarted = () => {
         // Session started
-      };
-      recognizer.sessionStopped = () => {
+      };      recognizer.sessionStopped = () => {
         setIsListening(false);
-        // Mark session end        sessionEndTime.current = Date.now();
-        // Calculate and send duration
-        if (sessionStartTime.current && sessionEndTime.current) {
-          const durationMs = sessionEndTime.current - sessionStartTime.current;
-          if (durationMs > 0) {
-            apiClient.post('/api/stats/speech-duration', { seconds: durationMs / 1000 })
-              .catch(() => {/* ignore errors for now */});
-          }
+        // Send total accumulated speech duration for this session
+        if (totalSpeechDuration.current > 0) {
+          apiClient.post('/api/stats/speech-duration', { seconds: totalSpeechDuration.current / 1000 })
+            .catch(() => {/* ignore errors for now */});
         }
         cleanup();
-      };
-      recognizer.speechStartDetected = () => {
-        // Speech start detected
+      };      recognizer.speechStartDetected = () => {
+        // Record when actual speech starts
+        speechStartTime.current = Date.now();
       };
       recognizer.speechEndDetected = () => {
-        // Speech end detected
+        // Calculate and accumulate actual speech duration
+        if (speechStartTime.current) {
+          const speechDuration = Date.now() - speechStartTime.current;
+          totalSpeechDuration.current += speechDuration;
+          speechStartTime.current = null;
+        }
       };
       recognizer.canceled = (_s, e) => {
         setError(`Recognition canceled: ${e.errorDetails || e.reason}`);
