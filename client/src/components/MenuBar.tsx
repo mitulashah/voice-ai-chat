@@ -2,30 +2,23 @@ import React, { useState } from 'react';
 import { Box, IconButton, Collapse, Typography, useTheme, Button } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
-import { useTemplate } from '../context/TemplateContext';
-import { usePersonaScenario } from '../context/PersonaScenarioContext';
-import { useMood } from '../context/MoodContext';
 import { useVoice } from '../context/VoiceContext';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import type { Template } from '../context/template-types';
+import { PersonasCrud } from './PersonasCrud';
+import { ScenariosCrud } from './ScenariosCrud';
+import { MoodsCrud } from './MoodsCrud';
+import { TemplatesCrud } from './TemplatesCrud';
 
 const MenuBar: React.FC = () => {
   const [open, setOpen] = useState(false);
   const { isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
-  const { templates, setCurrentTemplate, currentTemplate } = useTemplate();  const { personas, scenarios, selectedPersona, setSelectedPersona, selectedScenario, setSelectedScenario } = usePersonaScenario();
-  const { moods, selectedMood, setSelectedMood } = useMood();
+  // No need to destructure scenarios since ScenariosCrud handles them
   const theme = useTheme();
   const { voiceOptions, selectedVoice, setSelectedVoice } = useVoice();
-
   const handleToggle = () => {
     setOpen(prev => !prev);
-  };
-
-  const handleSelect = (template: Template) => {
-    setCurrentTemplate(template);
-    setOpen(false);
   };
 
   return (
@@ -60,94 +53,15 @@ const MenuBar: React.FC = () => {
         )}
        </Box>
       <Collapse in={open} timeout="auto" unmountOnExit>
-        <Box sx={{ px: 0.5, pb: 0.5, pt: 0.25, width: '100%', bgcolor: 'transparent', borderBottom: `1px solid ${theme.palette.divider}`, mt: 1.5, display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {/* Main content in a row */}
-          <Box sx={{ display: 'flex', flexDirection: 'row', gap: 2, alignItems: 'flex-start' }}>          {/* Personas Section - Larger, tiled horizontally */}
-          <Box sx={{ minWidth: 260, flex: 2 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5, color: theme.palette.primary.main }}>Personas</Typography>
-            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 0.5, mb: 2 }}>              {personas.map(p => (
-                <Box
-                  key={p.id}
-                  onClick={() => setSelectedPersona(p)}
-                  sx={{
-                    p: 0.75,
-                    cursor: 'pointer',
-                    borderRadius: 1,
-                    border: `2px solid ${theme.palette.primary.main}`,
-                    textAlign: 'center',
-                    background: selectedPersona?.id === p.id 
-                      ? theme.palette.primary.light + '20' // Light blue background when selected
-                      : 'transparent',
-                    transition: 'background 0.2s, border 0.2s',
-                    fontSize: '0.85rem',
-                    '&:hover': {
-                      background: theme.palette.primary.light + '10',
-                    },
-                  }}
-                >                  <Typography 
-                    variant="body2" 
-                    sx={{ 
-                      fontWeight: 500, 
-                      fontSize: '0.75rem', // Standardized to 0.75rem
-                      lineHeight: 1.1,
-                      color: theme.palette.primary.main
-                    }}
-                  >
-                    {p.name}
-                  </Typography>
-                  {p.description && (
-                    <Typography 
-                      variant="caption" 
-                      sx={{ 
-                        fontSize: '0.65rem', // Reduced from 0.75rem
-                        lineHeight: 1.1,
-                        color: theme.palette.primary.dark
-                      }}
-                    >
-                      {p.description}
-                    </Typography>
-                  )}
-                </Box>
-              ))}
-            </Box>
-          </Box>
-          {/* Moods Section - Larger, tiled horizontally */}
+        <Box sx={{ px: 0.5, pb: 0.5, pt: 0.25, width: '100%', bgcolor: 'transparent', borderBottom: `1px solid ${theme.palette.divider}`, mt: 1.5, display: 'flex', flexDirection: 'column', gap: 2 }}>          {/* Main content in a row */}
+          <Box sx={{ display: 'flex', flexDirection: 'row', gap: 2, alignItems: 'flex-start' }}>
+          
+          {/* Personas Section with CRUD */}
+          <PersonasCrud />          {/* Moods Section with CRUD */}
           <Box sx={{ minWidth: 180, flex: 1.5 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5, color: theme.palette.warning.main }}>Moods</Typography>
-            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 0.5, mb: 2 }}>              {moods.map(m => (
-                <Box
-                  key={m.mood}
-                  onClick={() => setSelectedMood(m)}
-                  sx={{
-                    p: 0.75,
-                    cursor: 'pointer',
-                    borderRadius: 1,
-                    border: `2px solid ${theme.palette.warning.main}`,
-                    textAlign: 'center',
-                    background: selectedMood?.mood === m.mood 
-                      ? theme.palette.warning.light + '40' // Light orange background when selected
-                      : 'transparent',
-                    transition: 'background 0.2s, border 0.2s',
-                    fontSize: '0.85rem',
-                    '&:hover': {
-                      background: theme.palette.warning.light + '20',
-                    },
-                  }}
-                >                  <Typography 
-                    variant="body2" 
-                    sx={{ 
-                      fontWeight: 500, 
-                      fontSize: '0.75rem', // Standardized to 0.75rem
-                      lineHeight: 1.1,
-                      color: theme.palette.warning.main
-                    }}
-                  >
-                    {m.mood}
-                  </Typography>
-                </Box>
-              ))}            </Box>
+            <MoodsCrud />
             
-            {/* Voices Section - Moved under Moods */}
+            {/* Voices Section - Under Moods */}
             <Box>
               <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5, color: '#E91E63' /* pink/magenta */ }}>Voices</Typography>
               <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 0.5, mb: 2 }}>
@@ -188,92 +102,11 @@ const MenuBar: React.FC = () => {
             </Box>
           </Box>          {/* Templates & Voices - Stacked vertically, more compact */}
           <Box sx={{ minWidth: 200, flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {/* Templates Section */}
-            <Box>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5, color: theme.palette.success.main }}>Templates</Typography>
-              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 0.5 }}>                {templates.map(t => (
-                  <Box
-                    key={t.id}
-                    onClick={() => handleSelect(t)}
-                    sx={{
-                      p: 0.75,
-                      cursor: 'pointer',
-                      borderRadius: 1,
-                      border: `2px solid ${theme.palette.success.main}`,
-                      textAlign: 'center',
-                      background: t.id === currentTemplate?.id 
-                        ? theme.palette.success.light + '40' // Light green background when selected
-                        : 'transparent',
-                      transition: 'background 0.2s, border 0.2s',
-                      fontSize: '0.82rem',
-                      '&:hover': {
-                        background: theme.palette.success.light + '20',
-                      },
-                    }}
-                  >                    <Typography 
-                      variant="subtitle2" 
-                      sx={{ 
-                        fontSize: '0.75rem', // Already at 0.75rem - no change needed
-                        lineHeight: 1.1,
-                        color: theme.palette.success.main                      }}
-                    >
-                      {t.name}
-                    </Typography>
-                  </Box>
-                ))}
-              </Box>
-            </Box>
+            {/* Templates Section with CRUD */}
+            <TemplatesCrud />
             
-            {/* Scenarios Section - Moved under Templates */}
-            <Box>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5, color: '#7B1FA2' /* deep purple */ }}>Scenarios</Typography>
-              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 0.5, mb: 2 }}>
-                {scenarios.map(s => (
-                  <Box
-                    key={s.id}
-                    onClick={() => setSelectedScenario(s)}
-                    sx={{
-                      p: 0.75,
-                      cursor: 'pointer',
-                      borderRadius: 1,
-                      border: '2px solid #7B1FA2', // Deep purple border
-                      textAlign: 'center',
-                      background: selectedScenario?.id === s.id 
-                        ? '#F3E5F5' // Light purple background when selected
-                        : 'transparent',
-                      transition: 'background 0.2s, border 0.2s',
-                      fontSize: '0.82rem',
-                      '&:hover': {
-                        background: '#F3E5F5' + '80', // Lighter purple on hover
-                      },
-                    }}
-                  >
-                    <Typography 
-                      variant="body2" 
-                      sx={{ 
-                        fontWeight: 500, 
-                        fontSize: '0.75rem', 
-                        lineHeight: 1.1, 
-                        color: '#7B1FA2' 
-                      }}
-                    >
-                      {s.name}
-                    </Typography>
-                    {s.description && (
-                      <Typography 
-                        variant="caption" 
-                        sx={{ 
-                          fontSize: '0.6rem', 
-                          lineHeight: 1.1,
-                          color: '#6A1B9A' // Slightly darker purple for description
-                        }}
-                      >
-                        {s.description}
-                      </Typography>
-                    )}
-                  </Box>                ))}
-              </Box>
-            </Box>
+            {/* Scenarios Section with CRUD */}
+            <ScenariosCrud />
           </Box>
           </Box>
           

@@ -60,13 +60,20 @@ export class FileSyncDatabase extends DocumentDatabase {
     this.watchers = [];
     await super.close();
   }
-
   private async syncAllFiles(): Promise<void> {
     try {
       await this.syncPersonas();
       await this.syncTemplates();
       await this.syncScenarios();
-      await this.syncMoods();
+      
+      // Only sync moods from file on fresh database initialization
+      // After that, moods are managed via CRUD operations
+      if (this.isFreshInit()) {
+        console.log('🆕 Fresh database detected - loading initial moods from file');
+        await this.syncMoods();
+      } else {
+        console.log('📊 Existing database - skipping mood file sync (using database moods)');
+      }
     } catch (error) {
       console.error('❌ Error during file sync:', error);
       throw error;
@@ -138,12 +145,11 @@ export class FileSyncDatabase extends DocumentDatabase {
       throw error;
     }
   }
-
   private async syncMoods(): Promise<void> {
     try {
       const content = await fs.readFile(this.moodsFile, 'utf-8');
       const moods = JSON.parse(content);
-      // Remove all existing moods
+      // Remove all existing moods (this will delete any CRUD-created moods!)
       if (this.db) this.db.run('DELETE FROM moods');
       // Insert all moods from file
       if (this.db) {
@@ -155,7 +161,7 @@ export class FileSyncDatabase extends DocumentDatabase {
         // Log row count after insert
         const countResult = this.db.exec('SELECT COUNT(*) as count FROM moods');
         const count = countResult[0]?.values[0]?.[0] ?? 0;
-        console.log(`[syncMoods] Inserted moods, row count now: ${count}`);
+        console.log(`[syncMoods] Inserted moods from file, row count now: ${count}`);
       }
       console.log(`🔄 Synced moods from moods.json (${moods.length} moods)`);
     } catch (error) {
@@ -398,6 +404,92 @@ export class FileSyncDatabase extends DocumentDatabase {
     return moods;
   }
 
+  // === MOOD-SPECIFIC CRUD METHODS ===
+
+  public getMoodById(id: string): { id: string; mood: string; description: string } | null {
+    if (!this.db) {
+      console.log('[getMoodById] No db instance');
+      return null;
+    }
+    
+    const result = this.db.exec('SELECT mood, description FROM moods WHERE mood = ?', [id]);
+    console.log('[getMoodById] Query result:', JSON.stringify(result, null, 2));
+    
+    if (!result[0] || !result[0].values[0]) {
+      console.log('[getMoodById] No result found for id:', id);
+      return null;
+    }
+    
+    const [mood, description] = result[0].values[0];
+    return {
+      id: String(mood),
+      mood: String(mood),
+      description: String(description)
+    };
+  }
+  public createMood(moodData: { id: string; mood: string; description: string }): void {
+    if (!this.db) {
+      console.log('[createMood] No db instance');
+      throw new Error('Database not initialized');
+    }
+    
+    try {
+      this.db.run('INSERT INTO moods (mood, description) VALUES (?, ?)', [moodData.mood, moodData.description]);
+      console.log('[createMood] Created mood:', moodData.mood);
+    } catch (error) {
+      console.error('[createMood] Error:', error);
+      throw error;
+    }
+  }public updateMood(id: string, moodData: { mood: string; description: string }): void {
+    if (!this.db) {
+      console.log('[updateMood] No db instance');
+      throw new Error('Database not initialized');
+    }
+    
+    try {
+      // First check if the mood exists
+      const existsResult = this.db.exec('SELECT COUNT(*) as count FROM moods WHERE mood = ?', [id]);
+      const count = existsResult[0]?.values[0]?.[0];
+      const exists = count && Number(count) > 0;
+      
+      if (!exists) {
+        throw new Error(`Mood with id '${id}' not found`);
+      }
+      
+      // Update the mood
+      this.db.run('UPDATE moods SET mood = ?, description = ? WHERE mood = ?', [moodData.mood, moodData.description, id]);
+      console.log('[updateMood] Updated mood:', id);
+    } catch (error) {
+      console.error('[updateMood] Error:', error);
+      throw error;
+    }
+  }
+
+  public deleteMood(id: string): void {
+    if (!this.db) {
+      console.log('[deleteMood] No db instance');
+      throw new Error('Database not initialized');
+    }
+    
+    try {
+      // First check if the mood exists
+      const existsResult = this.db.exec('SELECT COUNT(*) as count FROM moods WHERE mood = ?', [id]);
+      const count = existsResult[0]?.values[0]?.[0];
+      const exists = count && Number(count) > 0;
+      
+      if (!exists) {
+        throw new Error(`Mood with id '${id}' not found`);
+      }
+      
+      // Delete the mood
+      this.db.run('DELETE FROM moods WHERE mood = ?', [id]);
+      console.log('[deleteMood] Deleted mood:', id);
+    } catch (error) {
+      console.error('[deleteMood] Error:', error);
+      throw error;
+    }
+  }
+
   // Manual sync methods for testing
   async forceSyncPersonas(): Promise<void> {
     console.log('🔄 Force syncing personas...');
@@ -407,6 +499,12 @@ export class FileSyncDatabase extends DocumentDatabase {
   async forceSyncTemplates(): Promise<void> {
     console.log('🔄 Force syncing templates...');
     await this.syncTemplates();
+  }
+
+  async forceSyncMoods(): Promise<void> {
+    console.log('⚠️  WARNING: Force syncing moods will DELETE all CRUD-created moods!');
+    console.log('🔄 Force syncing moods from file...');
+    await this.syncMoods();
   }
 
   async forceSyncAll(): Promise<void> {

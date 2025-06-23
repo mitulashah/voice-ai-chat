@@ -23,13 +23,13 @@ export interface DocumentStats {
 export class DocumentDatabase {
   protected db: Database | null = null;
   protected isInitialized = false;
+  protected isFreshDatabase = false;
   private dbPath: string;
 
   constructor(dbPath?: string) {
     this.dbPath = dbPath || path.join(process.cwd(), 'data', 'voice-ai-documents.db');
     this.initializeDatabase();
   }
-
   private async initializeDatabase(): Promise<void> {
     try {
       const SQL = await initSqlJs();
@@ -39,10 +39,12 @@ export class DocumentDatabase {
         // Load existing database
         const filebuffer = fs.readFileSync(this.dbPath);
         this.db = new SQL.Database(filebuffer);
+        this.isFreshDatabase = false;
         console.log(`Loaded existing database from ${this.dbPath}`);
       } else {
         // Create new database
         this.db = new SQL.Database();
+        this.isFreshDatabase = true;
         console.log(`Created new database at ${this.dbPath}`);
       }
 
@@ -398,6 +400,95 @@ export class DocumentDatabase {
     }
     stmt.free();
     return names;
+  }
+
+  // === MOOD OPERATIONS ===
+
+  getAllMoods(): { mood: string; description: string }[] {
+    this.ensureInitialized();
+    const result = this.db!.exec('SELECT mood, description FROM moods');
+    if (!result[0]) return [];
+    
+    return result[0].values.map(([mood, description]) => ({
+      mood: String(mood),
+      description: String(description)
+    }));
+  }
+
+  getMoodById(id: string): { id: string; mood: string; description: string } | null {
+    this.ensureInitialized();
+    const result = this.db!.exec('SELECT mood, description FROM moods WHERE mood = ?', [id]);
+    
+    if (!result[0] || !result[0].values[0]) {
+      return null;
+    }
+    
+    const [mood, description] = result[0].values[0];
+    return {
+      id: String(mood),
+      mood: String(mood),
+      description: String(description)
+    };
+  }
+  createMood(moodData: { id: string; mood: string; description?: string }): void {
+    this.ensureInitialized();
+    try {
+      this.db!.run('INSERT INTO moods (mood, description) VALUES (?, ?)', [
+        moodData.mood, 
+        moodData.description || ''
+      ]);
+    } catch (error) {
+      console.error('[createMood] Error:', error);
+      throw error;
+    }
+  }
+
+  updateMood(id: string, moodData: { mood: string; description?: string }): void {
+    this.ensureInitialized();
+    try {
+      // First check if the mood exists
+      const existsResult = this.db!.exec('SELECT COUNT(*) as count FROM moods WHERE mood = ?', [id]);
+      const count = existsResult[0]?.values[0]?.[0];
+      const exists = count && Number(count) > 0;
+      
+      if (!exists) {
+        throw new Error(`Mood with id '${id}' not found`);
+      }
+        // Update the mood
+      this.db!.run('UPDATE moods SET mood = ?, description = ? WHERE mood = ?', [
+        moodData.mood, 
+        moodData.description || '', 
+        id
+      ]);
+    } catch (error) {
+      console.error('[updateMood] Error:', error);
+      throw error;
+    }
+  }
+
+  deleteMood(id: string): void {
+    this.ensureInitialized();
+    try {
+      // First check if the mood exists
+      const existsResult = this.db!.exec('SELECT COUNT(*) as count FROM moods WHERE mood = ?', [id]);
+      const count = existsResult[0]?.values[0]?.[0];
+      const exists = count && Number(count) > 0;
+      
+      if (!exists) {
+        throw new Error(`Mood with id '${id}' not found`);
+      }
+      
+      // Delete the mood
+      this.db!.run('DELETE FROM moods WHERE mood = ?', [id]);
+    } catch (error) {
+      console.error('[deleteMood] Error:', error);
+      throw error;
+    }
+  }
+
+  // Check if this is a fresh database (newly created)
+  isFreshInit(): boolean {
+    return this.isFreshDatabase;
   }
 
   // Check if database is ready

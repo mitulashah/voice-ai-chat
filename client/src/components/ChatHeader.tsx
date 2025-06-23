@@ -85,7 +85,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
       <Chip
         key="scenario"
         icon={<TheatersIcon />}
-        label={`Scenario: ${selectedScenario.name}`}
+        label={`Scenario: ${selectedScenario.title}`}
         variant="outlined"
         size="small"
         sx={{

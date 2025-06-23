@@ -1,5 +1,5 @@
 import { DocumentDatabase } from '../database/document-database';
-import type { Persona, Template, Scenario } from '../types/api';
+import type { Persona, Template, Scenario, Mood } from '../types/api';
 
 /**
  * Unified business logic service that wraps DocumentDatabase operations.
@@ -66,15 +66,78 @@ export class DocumentService {
   }
 
   async listPersonas(): Promise<Persona[]> {
-    return this.db.getAllPersonas();
-  }
+    return this.db.getAllPersonas();  }
 
   async searchPersonas(query: string): Promise<Persona[]> {
     return this.db.searchDocuments('persona', query);
   }
 
-  // === TEMPLATE OPERATIONS ===
+  // === MOOD OPERATIONS ===
+  
+  async createMood(moodData: Omit<Mood, 'id'>): Promise<Mood> {
+    const mood = {
+      id: moodData.mood, // Use mood name as ID
+      ...moodData
+    };
+    
+    this.validateMood(mood);
+      // Use the mood-specific method instead of the document system
+    this.db.createMood({
+      id: mood.id,
+      mood: mood.mood,
+      description: mood.description || ''
+    });
+    
+    return mood;
+  }
 
+  async getMood(id: string): Promise<Mood | null> {
+    return this.db.getMoodById(id);
+  }
+
+  async updateMood(id: string, updates: Partial<Mood>): Promise<Mood> {
+    const existing = await this.getMood(id);
+    if (!existing) {
+      throw new Error(`Mood with id '${id}' not found`);
+    }
+
+    const updated = { ...existing, ...updates, id }; // Ensure ID doesn't change
+    this.validateMood(updated);
+      // Use the mood-specific method
+    this.db.updateMood(id, { 
+      mood: updated.mood, 
+      description: updated.description || '' 
+    });
+    
+    return updated;
+  }
+
+  async deleteMood(id: string): Promise<void> {
+    const existing = await this.getMood(id);
+    if (!existing) {
+      throw new Error(`Mood with id '${id}' not found`);
+    }
+    
+    this.db.deleteMood(id);
+  }  async listMoods(): Promise<Mood[]> {
+    // Convert the existing getAllMoods format to the new Mood interface
+    const existingMoods = this.db.getAllMoods();
+    return existingMoods.map((m: { mood: string; description: string }) => ({
+      id: m.mood, // Use mood name directly as ID for simplicity and consistency
+      mood: m.mood,
+      description: m.description
+    }));
+  }
+
+  async searchMoods(query: string): Promise<Mood[]> {
+    const allMoods = await this.listMoods();
+    return allMoods.filter(mood => 
+      mood.mood.toLowerCase().includes(query.toLowerCase()) ||
+      (mood.description && mood.description.toLowerCase().includes(query.toLowerCase()))
+    );
+  }
+
+  // === TEMPLATE OPERATIONS ===
   async createTemplate(templateData: Omit<Template, 'id'>): Promise<Template> {
     const template = {
       id: this.generateId(templateData.name),
@@ -83,22 +146,36 @@ export class DocumentService {
     
     this.validateTemplate(template);
     
+    // Map prompt -> content for database storage
+    const dbTemplate = {
+      ...template,
+      content: template.prompt, // Map prompt -> content for database
+      prompt: undefined // Remove prompt field for database
+    };
+    
     this.db.upsertDocument(
       template.id,
       'prompt_template',
       template.name,
-      template,
+      dbTemplate,
       '',
       new Date()
     );
     
     return template;
   }
-
   async getTemplate(id: string): Promise<Template | null> {
-    return this.db.getTemplateById(id) as Template | null;
+    const template = await this.db.getTemplateById(id);
+    if (!template) return null;
+    
+    // Map database format to client-expected format
+    return {
+      id: template.id,
+      name: template.name,
+      prompt: template.content || template.prompt, // Map content -> prompt
+      description: template.description
+    };
   }
-
   async updateTemplate(id: string, updates: Partial<Template>): Promise<Template> {
     const existing = await this.getTemplate(id);
     if (!existing) {
@@ -108,11 +185,18 @@ export class DocumentService {
     const updated = { ...existing, ...updates, id }; // Ensure ID doesn't change
     this.validateTemplate(updated);
     
+    // Map prompt -> content for database storage
+    const dbTemplate = {
+      ...updated,
+      content: updated.prompt, // Map prompt -> content for database
+      prompt: undefined // Remove prompt field for database
+    };
+    
     this.db.upsertDocument(
       id,
       'prompt_template',
       updated.name,
-      updated,
+      dbTemplate,
       '',
       new Date()
     );
@@ -128,9 +212,15 @@ export class DocumentService {
     
     this.db.deleteDocument(id, 'prompt_template');
   }
-
   async listTemplates(): Promise<Template[]> {
-    return this.db.getAllTemplates();
+    const templates = await this.db.getAllTemplates();
+    // Map database format to client-expected format
+    return templates.map((template: any): Template => ({
+      id: template.id,
+      name: template.name,
+      prompt: template.content || template.prompt, // Map content -> prompt
+      description: template.description
+    }));
   }
   async searchTemplates(query: string): Promise<Template[]> {
     return this.db.searchDocuments('prompt_template', query);
@@ -197,24 +287,23 @@ export class DocumentService {
   async listScenarios(): Promise<Scenario[]> {
     return this.db.getAllScenarios();
   }
-
-  // === MOOD OPERATIONS ===
-  // Note: Moods are stored differently and don't support full CRUD in current schema
-
-  async listMoods(): Promise<{ mood: string; description: string }[]> {
-    // For now, moods are read-only since they're stored in a separate table
-    // This will need to be enhanced when adding mood CRUD support
-    throw new Error('Mood operations require database schema updates - use existing mood endpoints for now');
-  }
-
   // === VALIDATION METHODS ===
-
   private validatePersona(persona: Persona): void {
     if (!persona.name || persona.name.trim().length === 0) {
       throw new Error('Persona name is required');
     }
     if (!persona.id || persona.id.trim().length === 0) {
       throw new Error('Persona ID is required');
+    }
+    // Add more validation as needed
+  }
+
+  private validateMood(mood: Mood): void {
+    if (!mood.mood || mood.mood.trim().length === 0) {
+      throw new Error('Mood name is required');
+    }
+    if (!mood.id || mood.id.trim().length === 0) {
+      throw new Error('Mood ID is required');
     }
     // Add more validation as needed
   }
@@ -243,6 +332,15 @@ export class DocumentService {
   }
 
   // === UTILITY METHODS ===
+
+  private generateStableId(name: string): string {
+    // Generate a stable, URL-friendly ID from the name (no timestamp)
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .substring(0, 50);
+  }
 
   private generateId(name: string): string {
     // Generate a URL-friendly ID from the name

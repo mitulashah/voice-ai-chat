@@ -16,6 +16,12 @@ export interface Template {
   prompt: string;
 }
 
+export interface Mood {
+  id: string;
+  mood: string;
+  description?: string;
+}
+
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;

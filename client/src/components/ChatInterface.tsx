@@ -178,19 +178,23 @@ const ChatInterface: React.FC = () => {
       conversationId: `conv_${startTime}_${endTime}`,
       
       // Context information
-      context: {
-        persona: selectedPersona ? {
+      context: {        persona: selectedPersona ? {
           id: selectedPersona.id,
           name: selectedPersona.name,
-          description: selectedPersona.description,
+          description: [
+            selectedPersona.demographics?.role,
+            selectedPersona.demographics?.ageGroup,
+            selectedPersona.behavior,
+            selectedPersona.needs,
+            selectedPersona.painpoints
+          ].filter(Boolean).join(', ') || 'No description available',
           // Note: Full persona details with demographics, behavior, etc. 
           // are stored server-side and would need to be fetched for complete export
         } : null,
-        
-        scenario: selectedScenario ? {
+          scenario: selectedScenario ? {
           id: selectedScenario.id,
-          name: selectedScenario.name,
-          description: selectedScenario.description
+          name: selectedScenario.title,
+          description: selectedScenario.scenario?.description || 'No description available'
         } : null,
         
         mood: selectedMood ? {
@@ -596,7 +600,7 @@ const ChatInterface: React.FC = () => {
              .replace('T', '_');
           let filename = `conversation_${timestamp}`;
           if (selectedScenario?.name) {
-            filename += `_${selectedScenario.name.replace(/\s/g, '_')}`;
+            filename += `_${selectedScenario.title.replace(/\s/g, '_')}`;
           }
           const blob = new Blob([json], { type: 'application/json' });
           const link = document.createElement('a');
