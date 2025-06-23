@@ -118,10 +118,35 @@ resource "azurerm_role_assignment" "shared_acr_pull" {
   depends_on           = [azurerm_user_assigned_identity.shared, azurerm_container_registry.acr]
 }
 
+# Role assignment for Azure Files access
+resource "azurerm_role_assignment" "shared_storage_file_data_contributor" {
+  principal_id         = azurerm_user_assigned_identity.shared.principal_id
+  role_definition_name = "Storage File Data SMB Share Contributor"
+  scope                = azurerm_storage_account.voice_ai_storage.id
+  depends_on           = [azurerm_user_assigned_identity.shared, azurerm_storage_account.voice_ai_storage]
+}
+
+# Alternative: Storage Account Contributor for broader access
+resource "azurerm_role_assignment" "shared_storage_account_contributor" {
+  principal_id         = azurerm_user_assigned_identity.shared.principal_id
+  role_definition_name = "Storage Account Contributor"
+  scope                = azurerm_storage_account.voice_ai_storage.id
+  depends_on           = [azurerm_user_assigned_identity.shared, azurerm_storage_account.voice_ai_storage]
+}
+
 # Add a delay to allow RBAC propagation for AcrPull role assignment
 resource "time_sleep" "acr_rbac_propagation" {
   depends_on = [azurerm_role_assignment.shared_acr_pull]
   create_duration = "120s"
+}
+
+# Add a delay to allow RBAC propagation for storage role assignments
+resource "time_sleep" "storage_rbac_propagation" {
+  depends_on = [
+    azurerm_role_assignment.shared_storage_file_data_contributor,
+    azurerm_role_assignment.shared_storage_account_contributor
+  ]
+  create_duration = "60s"
 }
 
 # Client Container App
@@ -307,7 +332,7 @@ resource "azurerm_container_app" "server" {
       env {
         name        = "AZURE_SPEECH_KEY"
         secret_name = "azure-speech-key"
-      }
+      }      
       env {
         name        = "AZURE_SPEECH_REGION"
         secret_name = "azure-speech-region"
@@ -332,7 +357,7 @@ resource "azurerm_container_app" "server" {
     min_replicas = 1
     max_replicas = 2
   }
-  depends_on = [time_sleep.acr_rbac_propagation]
+  depends_on = [time_sleep.acr_rbac_propagation, time_sleep.storage_rbac_propagation]
 
   ingress {
     external_enabled            = true

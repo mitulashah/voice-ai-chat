@@ -14,10 +14,15 @@ export class DatabaseMigration {
   private personasDir: string;
   private promptsDir: string;
 
-  constructor(dbPath?: string) {
-    this.db = new DocumentDatabase(dbPath);
+  private constructor(db: DocumentDatabase) {
+    this.db = db;
     this.personasDir = path.join(__dirname, '..', 'personas');
     this.promptsDir = path.join(__dirname, '..', 'prompts');
+  }
+
+  static async create(dbPath?: string): Promise<DatabaseMigration> {
+    const db = await DocumentDatabase.create(dbPath);
+    return new DatabaseMigration(db);
   }
 
   async migrateFromFiles(): Promise<MigrationResult> {
@@ -210,7 +215,7 @@ export class DatabaseMigration {
 async function runMigration(): Promise<void> {
   console.log('🚀 Starting database migration...\n');
   
-  const migration = new DatabaseMigration();
+  const migration = await DatabaseMigration.create();
   
   try {
     const result = await migration.migrateFromFiles();

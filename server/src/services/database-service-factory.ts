@@ -127,23 +127,21 @@ export class DatabaseServiceFactory {
     this.initializationPromise = this._initializeWithSeedData();
     return this.initializationPromise;
   }
-
   private async _initializeWithSeedData(): Promise<void> {
     try {
       console.log('🗃️  Initializing database with seed data approach...');
       
       // Always use DocumentDatabase (no file watchers)
       const dbPath = this.config.dbPath || path.join(process.cwd(), 'data', 'voice-ai-documents.db');
-      const docDatabase = new DocumentDatabase(dbPath);
-      
-      // Check if database is empty (needs seeding)
+      const docDatabase = await DocumentDatabase.create(dbPath);
+        // Check if database is empty (needs seeding)
       const stats = docDatabase.getDocumentStats();
       const isEmpty = stats.total === 0;
       
       if (isEmpty) {
         console.log('📁 Database is empty, seeding from files...');
         const { DatabaseMigration } = await import('../database/migration');
-        const migration = new DatabaseMigration(dbPath);
+        const migration = await DatabaseMigration.create(dbPath);
         const result = await migration.migrateFromFiles();
         
         if (result.success) {
@@ -154,7 +152,9 @@ export class DatabaseServiceFactory {
       } else {
         console.log(`🗃️  Database already populated (${stats.total} documents), skipping seed`);
       }
-        this.database = docDatabase;
+      
+      // Set the database instance (this was incorrectly indented inside the if block)
+      this.database = docDatabase;
       
       // Initialize DocumentService with the database
       this.documentService = new DocumentService(docDatabase);

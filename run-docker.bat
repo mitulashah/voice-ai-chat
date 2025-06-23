@@ -9,5 +9,5 @@ docker compose up
 
 echo.
 echo Client running at http://localhost:5173
- echo Server running at http://localhost:3000
+echo Server running at http://localhost:5000
 pause

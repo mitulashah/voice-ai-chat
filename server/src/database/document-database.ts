@@ -26,9 +26,14 @@ export class DocumentDatabase {
   protected isFreshDatabase = false;
   private dbPath: string;
 
-  constructor(dbPath?: string) {
+  protected constructor(dbPath?: string) {
     this.dbPath = dbPath || path.join(process.cwd(), 'data', 'voice-ai-documents.db');
-    this.initializeDatabase();
+  }
+
+  static async create(dbPath?: string): Promise<DocumentDatabase> {
+    const instance = new DocumentDatabase(dbPath);
+    await instance.initializeDatabase();
+    return instance;
   }
   private async initializeDatabase(): Promise<void> {
     try {

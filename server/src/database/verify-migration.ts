@@ -3,10 +3,7 @@ import { DocumentDatabase } from './document-database';
 async function verifyMigration(): Promise<void> {
   console.log('Verifying migration results...\n');
   
-  const db = new DocumentDatabase();
-  
-  // Wait for initialization
-  await new Promise(resolve => setTimeout(resolve, 500));
+  const db = await DocumentDatabase.create();
   
   if (!db.isReady()) {
     console.error('Database not ready');
