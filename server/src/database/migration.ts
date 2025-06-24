@@ -6,6 +6,8 @@ interface MigrationResult {
   success: boolean;
   personasCount: number;
   templatesCount: number;
+  moodsCount: number;
+  scenariosCount: number;
   errors: string[];
 }
 
@@ -13,27 +15,33 @@ export class DatabaseMigration {
   private db: DocumentDatabase;
   private personasDir: string;
   private promptsDir: string;
-
+  private scenariosDir: string;
+  private moodsFile: string;
   private constructor(db: DocumentDatabase) {
     this.db = db;
-    this.personasDir = path.join(__dirname, '..', 'personas');
-    this.promptsDir = path.join(__dirname, '..', 'prompts');
+    // In production containers, the source directories are copied to /app/src/
+    // In development, they're in the src directory relative to project root
+    const isProduction = process.env.NODE_ENV === 'production' || process.cwd() === '/app';
+    const baseDir = isProduction ? path.join(process.cwd(), 'src') : path.join(process.cwd(), 'src');
+    this.personasDir = path.join(baseDir, 'personas');
+    this.promptsDir = path.join(baseDir, 'prompts');
+    this.scenariosDir = path.join(baseDir, 'scenarios');
+    this.moodsFile = path.join(baseDir, 'util', 'moods.json');
   }
 
   static async create(dbPath?: string): Promise<DatabaseMigration> {
     const db = await DocumentDatabase.create(dbPath);
     return new DatabaseMigration(db);
   }
-
   async migrateFromFiles(): Promise<MigrationResult> {
     const result: MigrationResult = {
       success: false,
       personasCount: 0,
       templatesCount: 0,
+      moodsCount: 0,
+      scenariosCount: 0,
       errors: []
-    };
-
-    console.log('Starting migration from files to database...');
+    };console.log('Starting migration from files to database...');
 
     // Wait for database to be ready
     let retries = 0;
@@ -119,16 +127,95 @@ export class DatabaseMigration {
             result.errors.push(errorMsg);
             console.error(`❌ ${errorMsg}`);
           }
-        }
-      } else {
+        }      } else {
         console.log('Prompts directory not found, skipping template migration');
       }
 
+      // Migrate moods
+      if (fs.existsSync(this.moodsFile)) {
+        try {
+          console.log('Found moods.json file to migrate');
+          const fileContent = fs.readFileSync(this.moodsFile, 'utf-8');
+          const moodsArray = JSON.parse(fileContent);
+          const stats = fs.statSync(this.moodsFile);
+          
+          if (Array.isArray(moodsArray)) {
+            for (const mood of moodsArray) {
+              try {
+                const id = mood.mood.toLowerCase().replace(/\s+/g, '-');
+                this.db.upsertDocument(
+                  id,
+                  'mood',
+                  mood.mood,
+                  mood,
+                  this.moodsFile,
+                  stats.mtime
+                );
+                
+                result.moodsCount++;
+                console.log(`✅ Migrated mood: ${mood.mood}`);
+              } catch (error) {
+                const errorMsg = `Failed to migrate mood ${mood.mood}: ${error}`;
+                result.errors.push(errorMsg);
+                console.error(`❌ ${errorMsg}`);
+              }
+            }
+          } else {
+            result.errors.push('moods.json does not contain an array');
+          }
+        } catch (error) {
+          const errorMsg = `Failed to read moods.json: ${error}`;
+          result.errors.push(errorMsg);
+          console.error(`❌ ${errorMsg}`);
+        }
+      } else {
+        console.log('Moods file not found, skipping mood migration');
+      }
+
+      // Migrate scenarios
+      if (fs.existsSync(this.scenariosDir)) {
+        const scenarioFiles = fs.readdirSync(this.scenariosDir)
+          .filter(f => f.endsWith('.json'));
+        
+        console.log(`Found ${scenarioFiles.length} scenario files to migrate`);
+        
+        for (const file of scenarioFiles) {
+          try {
+            const fileBaseId = path.basename(file, '.json');
+            const filePath = path.join(this.scenariosDir, file);
+            const fileContent = fs.readFileSync(filePath, 'utf-8');
+            const docObj = JSON.parse(fileContent);
+            const stats = fs.statSync(filePath);
+            // Use JSON id field if available, otherwise fallback to filename
+            const jsonId = typeof docObj.id === 'string' && docObj.id.trim() ? docObj.id : fileBaseId;
+            const scenarioName = docObj.title || docObj.name || jsonId;
+            // Insert using JSON id to support individual lookups
+            this.db.upsertDocument(
+              jsonId,
+              'scenario',
+              scenarioName,
+              docObj,
+              filePath,
+              stats.mtime
+            );
+            result.scenariosCount++;
+            console.log(`✅ Migrated scenario: ${jsonId}`);
+          } catch (error) {
+            const errorMsg = `Failed to migrate scenario ${file}: ${error}`;
+            result.errors.push(errorMsg);
+            console.error(`❌ ${errorMsg}`);
+          }
+        }
+      } else {
+        console.log('Scenarios directory not found, skipping scenario migration');
+      }
+
       // Check final results
-      const stats = this.db.getDocumentStats();
-      console.log('\nMigration completed!');
+      const stats = this.db.getDocumentStats();      console.log('\nMigration completed!');
       console.log(`- Personas migrated: ${result.personasCount}`);
       console.log(`- Templates migrated: ${result.templatesCount}`);
+      console.log(`- Moods migrated: ${result.moodsCount}`);
+      console.log(`- Scenarios migrated: ${result.scenariosCount}`);
       console.log(`- Total in database: ${stats.total}`);
       console.log(`- Errors: ${result.errors.length}`);
 
