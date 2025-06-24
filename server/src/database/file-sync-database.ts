@@ -31,25 +31,33 @@ export class FileSyncDatabase extends DocumentDatabase {
     this.moodsFile = path.join(baseDir, 'util', 'moods.json');
     this.watchFiles = options?.watchFiles ?? true;
     this.syncOnStartup = options?.syncOnStartup ?? true;
-  }
-
-  async initialize(): Promise<void> {
-    // Ensure the base DocumentDatabase is fully initialized before syncing files
-    if (!this.isInitialized) {
-      // Wait until the base class async initialization is done
-      while (!this.isInitialized) {
-        await new Promise(resolve => setTimeout(resolve, 50));
+  }  async initialize(): Promise<void> {
+    try {
+      console.log('[FileSyncDB] Starting FileSyncDatabase initialization...');
+      
+      // First, ensure the base DocumentDatabase is initialized
+      if (!this.isInitialized) {
+        console.log('[FileSyncDB] Initializing base DocumentDatabase...');
+        await this.initializeWithRestore();
+        console.log('[FileSyncDB] Base DocumentDatabase initialized successfully');
       }
-    }
-    if (this.syncOnStartup) {
-      console.log('🔄 Starting initial file sync...');
-      await this.syncAllFiles();
-      console.log('✅ Initial file sync completed');
-    }
-    if (this.watchFiles) {
-      console.log('👀  Starting file watchers...');
-      this.startFileWatchers();
-      console.log('✅ File watchers started');
+      
+      if (this.syncOnStartup) {
+        console.log('🔄 Starting initial file sync...');
+        await this.syncAllFiles();
+        console.log('✅ Initial file sync completed');
+      }
+      
+      if (this.watchFiles) {
+        console.log('👀  Starting file watchers...');
+        await this.startFileWatchers();
+        console.log('✅ File watchers started');
+      }
+      
+      console.log('[FileSyncDB] ✅ FileSyncDatabase initialization complete');
+    } catch (error) {
+      console.error('[FileSyncDB] ❌ Failed to initialize FileSyncDatabase:', error);
+      throw error;
     }
   }
 
