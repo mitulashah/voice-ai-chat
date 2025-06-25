@@ -91,8 +91,7 @@ export class DocumentDatabase {
       console.log(`[DB] Initializing SQL.js...`);
       const SQL = await initSqlJs();
       console.log(`[DB] SQL.js initialized successfully`);
-      
-      // Check if database file exists
+        // Check if database file exists
       if (fs.existsSync(this.dbPath)) {
         // Load existing database
         console.log(`[DB] Loading existing database file...`);
@@ -107,6 +106,21 @@ export class DocumentDatabase {
           const result = this.db.exec('SELECT COUNT(*) as total FROM documents');
           const totalRecords = result[0]?.values[0]?.[0] || 0;
           console.log(`[DB] Loaded database contains ${totalRecords} total records`);
+          
+          // Also check the schema - make sure documents table exists
+          const tableCheck = this.db.exec("SELECT name FROM sqlite_master WHERE type='table' AND name='documents'");
+          if (tableCheck.length > 0) {
+            console.log(`[DB] ✅ Documents table exists in loaded database`);
+            
+            // Let's also check what types of records we have
+            const typeCheck = this.db.exec('SELECT type, COUNT(*) as count FROM documents GROUP BY type');
+            if (typeCheck.length > 0 && typeCheck[0].values) {
+              console.log(`[DB] Records by type:`, typeCheck[0].values);
+            }
+          } else {
+            console.warn(`[DB] ⚠️  Documents table NOT found in loaded database!`);
+          }
+          
         } catch (error) {
           console.warn(`[DB] Could not count records in loaded database:`, error);
         }
@@ -460,11 +474,25 @@ export class DocumentDatabase {
     console.log('DEBUG: searchDocuments found', results.length, 'results');
     return results;
   }
-
   // Get document statistics
   getDocumentStats(): DocumentStats {
     this.ensureInitialized();
     
+    console.log(`[DEBUG] getDocumentStats called - DB initialized: ${this.isInitialized}, DB exists: ${!!this.db}`);
+    
+    // First, let's try a simple COUNT(*) to see if the table exists and has data
+    try {
+      const totalStmt = this.db!.prepare(`SELECT COUNT(*) as total FROM documents`);
+      if (totalStmt.step()) {
+        const totalRow = totalStmt.getAsObject();
+        console.log(`[DEBUG] Total documents in table: ${totalRow.total}`);
+      }
+      totalStmt.free();
+    } catch (error) {
+      console.error(`[DEBUG] Error getting total count:`, error);
+    }
+    
+    // Now get the breakdown by type
     const stmt = this.db!.prepare(`
       SELECT 
         type,
@@ -474,8 +502,10 @@ export class DocumentDatabase {
     `);
       const stats: DocumentStats = { personas: 0, templates: 0, scenarios: 0, moods: 0, total: 0 };
     
+    console.log(`[DEBUG] Starting to iterate through type counts...`);
     while (stmt.step()) {
       const row = stmt.getAsObject();
+      console.log(`[DEBUG] Found type: ${row.type}, count: ${row.count}`);
       if (row.type === 'persona') stats.personas = row.count as number;
       if (row.type === 'prompt_template') stats.templates = row.count as number;
       if (row.type === 'scenario') stats.scenarios = row.count as number;
@@ -484,6 +514,7 @@ export class DocumentDatabase {
     }
     stmt.free();
     
+    console.log(`[DEBUG] Final stats:`, stats);
     return stats;
   }
 

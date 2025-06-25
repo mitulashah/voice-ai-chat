@@ -192,16 +192,15 @@ parameters:
     setIsEditDialogOpen(false);
     setEditingTemplate(null);
   };
-
   return (
-    <Box>
+    <Box sx={{ minWidth: 260, flex: 2 }}>
       {/* Header */}
       <Box sx={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
         alignItems: 'center',
         mb: 1
-      }}>        <Typography variant="subtitle2" sx={{ 
+      }}><Typography variant="subtitle2" sx={{ 
           fontWeight: 600, 
           color: '#4caf50', // Green color for templates
           fontSize: '0.875rem' // Smaller header to match MenuBar style
@@ -219,7 +218,7 @@ parameters:
           <AddIcon fontSize="small" />
         </IconButton>
       </Box>      {/* Templates Grid - 2 columns for template names */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 0.5, mb: 2 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 0.5, mb: 2 }}>
         {templates.map((template) => (
           <Box
             key={template.id}
@@ -229,7 +228,11 @@ parameters:
               cursor: 'pointer',
               borderRadius: 1,
               border: `2px solid #4caf50`, // Green border
-              textAlign: 'center',              background: currentTemplate?.id === template.id 
+              textAlign: 'center',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: currentTemplate?.id === template.id 
                 ? '#c8e6c9' // Light green background for selected
                 : 'transparent',
               transition: 'background 0.2s, border 0.2s',
@@ -240,18 +243,20 @@ parameters:
             }}
           >
             <Typography 
-              variant="body2"              sx={{ 
+              variant="body2"
+              sx={{ 
                 fontWeight: 500, 
                 fontSize: '0.75rem', // Match original MenuBar template name size
                 lineHeight: 1.1,
-                color: '#4caf50' // Green text color
+                color: '#4caf50', // Green text color
+                textAlign: 'center'
               }}
             >
               {template.name}
             </Typography>
           </Box>
         ))}
-      </Box>      {/* Context Menu */}
+      </Box>{/* Context Menu */}
       <Menu
         open={contextMenu !== null}
         onClose={handleContextMenuClose}

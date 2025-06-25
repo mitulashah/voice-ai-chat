@@ -181,7 +181,7 @@ export const ScenariosCrud: React.FC = () => {
           <AddIcon fontSize="small" />
         </IconButton>
       </Box>      {/* Scenarios grid */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 0.5, mb: 2 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 0.5, mb: 2 }}>
         {scenarios.map(s => (
           <Box
             key={s.id}
@@ -192,6 +192,9 @@ export const ScenariosCrud: React.FC = () => {
               borderRadius: 1,
               border: `2px solid #9c27b0`, // Purple border
               textAlign: 'center',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               background: selectedScenario?.id === s.id 
                 ? '#e1bee7' // Light purple background for selected
                 : 'transparent',
@@ -201,19 +204,22 @@ export const ScenariosCrud: React.FC = () => {
                 background: '#f3e5f5', // Very light purple on hover
               },
             }}
-          >            <Typography 
-              variant="body2"              sx={{ 
+          >
+            <Typography 
+              variant="body2"
+              sx={{ 
                 fontWeight: 500, 
                 fontSize: '0.75rem', // Match original MenuBar scenario name size
                 lineHeight: 1.1,
-                color: '#9c27b0' // Purple text color
+                color: '#9c27b0', // Purple text color
+                textAlign: 'center'
               }}
             >
               {s.title}
             </Typography>
           </Box>
         ))}
-      </Box>      {/* Context Menu */}
+      </Box>{/* Context Menu */}
       <Menu
         open={contextMenu !== null}
         onClose={handleCloseContextMenu}

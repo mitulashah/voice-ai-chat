@@ -60,21 +60,22 @@ const MenuBar: React.FC = () => {
           <PersonasCrud />          {/* Moods Section with CRUD */}
           <Box sx={{ minWidth: 180, flex: 1.5 }}>
             <MoodsCrud />
-            
-            {/* Voices Section - Under Moods */}
+              {/* Voices Section - Under Moods */}
             <Box>
               <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5, color: '#E91E63' /* pink/magenta */ }}>Voices</Typography>
-              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 0.5, mb: 2 }}>
+              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 0.5, mb: 2 }}>
                 {voiceOptions.map(v => (
                   <Box
                     key={v.value}
-                    onClick={() => setSelectedVoice(v.value)}
-                    sx={{
+                    onClick={() => setSelectedVoice(v.value)}                    sx={{
                       p: 0.75,
                       cursor: 'pointer',
                       borderRadius: 1,
                       border: '2px solid #E91E63', // Pink/magenta border
                       textAlign: 'center',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
                       background: selectedVoice === v.value 
                         ? '#FCE4EC' // Light pink background when selected
                         : 'transparent',
@@ -91,7 +92,8 @@ const MenuBar: React.FC = () => {
                         fontWeight: 500, 
                         fontSize: '0.75rem', // Standardized to 0.75rem
                         lineHeight: 1.1,
-                        color: '#E91E63' // Pink/magenta text
+                        color: '#E91E63', // Pink/magenta text
+                        textAlign: 'center'
                       }}
                     >
                       {v.name}

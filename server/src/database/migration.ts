@@ -105,12 +105,19 @@ export class DatabaseMigration {
             const filePath = path.join(this.promptsDir, file);
             const fileContent = fs.readFileSync(filePath, 'utf-8');
             const stats = fs.statSync(filePath);
-            
-            // Parse prompty file (basic YAML frontmatter parsing)
+              // Parse prompty file (basic YAML frontmatter parsing)
             const document = this.parsePromptyFile(fileContent);
+            
+            // Debug logging to see what was parsed
+            console.log(`Debug - Parsing ${file}:`);
+            console.log(`  - Extracted name: "${document.name}"`);
+            console.log(`  - Metadata name: "${document.metadata?.name}"`);
+            console.log(`  - Fallback id: "${id}"`);
             
             // Use the name from frontmatter if available, else fallback to id
             const templateName = document.name || document.metadata?.name || id;
+            console.log(`  - Final template name: "${templateName}"`);
+            
             this.db.upsertDocument(
               id,
               'prompt_template',
@@ -233,7 +240,6 @@ export class DatabaseMigration {
 
     return result;
   }
-
   private parsePromptyFile(content: string): any {
     try {
       // Split frontmatter and content
@@ -247,29 +253,53 @@ export class DatabaseMigration {
         };
       }
 
-      // Parse YAML frontmatter (basic parsing)
+      // Parse YAML frontmatter (improved parsing)
       const frontmatter = parts[1].trim();
       const promptContent = parts.slice(2).join('---').trim();
       
       const metadata: any = {};
-      
-      // Basic YAML parsing for common fields
+        // Improved YAML parsing that respects nesting levels
       const lines = frontmatter.split('\n');
+      let currentSection: string | null = null;
+      let indentLevel = 0;
+      
+      console.log(`  Parsing frontmatter with ${lines.length} lines:`);
+      
       for (const line of lines) {
-        const colonIndex = line.indexOf(':');
+        const trimmedLine = line.trim();
+        if (!trimmedLine || trimmedLine.startsWith('#')) continue;
+        
+        const lineIndent = line.length - line.trimStart().length;
+        const colonIndex = trimmedLine.indexOf(':');
+        
         if (colonIndex > 0) {
-          const key = line.substring(0, colonIndex).trim();
-          const value = line.substring(colonIndex + 1).trim();
+          const key = trimmedLine.substring(0, colonIndex).trim();
+          const value = trimmedLine.substring(colonIndex + 1).trim();
           
-          // Remove quotes if present
-          const cleanValue = value.replace(/^['"](.*)['"]$/, '$1');
-          
-          // Handle arrays (basic)
-          if (cleanValue.startsWith('[') && cleanValue.endsWith(']')) {
-            metadata[key] = cleanValue.slice(1, -1).split(',').map(v => v.trim().replace(/^['"](.*)['"]$/, '$1'));
+          console.log(`    Line: "${line}" | Indent: ${lineIndent} | Key: "${key}" | Value: "${value}"`);
+            // Only process top-level keys (indentation level 0 only)
+          if (lineIndent === 0) {
+            currentSection = key;
+            indentLevel = lineIndent;
+            
+            // Remove quotes if present
+            const cleanValue = value.replace(/^['"](.*)['"]$/, '$1');
+            
+            console.log(`      -> Processing top-level key "${key}" with clean value: "${cleanValue}"`);
+            
+            // Handle arrays (basic)
+            if (cleanValue.startsWith('[') && cleanValue.endsWith(']')) {
+              metadata[key] = cleanValue.slice(1, -1).split(',').map(v => v.trim().replace(/^['"](.*)['"]$/, '$1'));
+              console.log(`      -> Set array: ${key} = [${metadata[key].join(', ')}]`);
+            } else if (cleanValue) {
+              // Only set value if it's not empty (avoid nested sections)
+              metadata[key] = cleanValue;
+              console.log(`      -> Set value: ${key} = "${cleanValue}"`);
+            }
           } else {
-            metadata[key] = cleanValue;
+            console.log(`      -> Skipping nested key "${key}" (indent: ${lineIndent})`);
           }
+          // Skip nested properties (like sample.name, inputs.persona, etc.)
         }
       }
 

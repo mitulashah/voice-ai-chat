@@ -136,39 +136,54 @@ export class DatabaseServiceFactory {
       // Check SKIP_RESTORE environment variable
       const skipRestore = process.env.SKIP_RESTORE === 'true';
       console.log(`🔄 SKIP_RESTORE environment variable: ${skipRestore}`);
-        const docDatabase = await DocumentDatabase.create(dbPath, skipRestore);
+      let docDatabase = await DocumentDatabase.create(dbPath, skipRestore);
         // Check if database is empty (needs seeding) OR if SKIP_RESTORE is true (force fresh seeding)
-      const stats = docDatabase.getDocumentStats();
-      const isEmpty = stats.total === 0;
-      const forceSeeding = skipRestore; // Force seeding when SKIP_RESTORE=true
-      
-      if (isEmpty || forceSeeding) {
-        if (forceSeeding) {
-          console.log('🔄 SKIP_RESTORE=true, forcing fresh seeding from files...');
-        } else {
-          console.log('📁 Database is empty, seeding from files...');
-        }
-        const { DatabaseMigration } = await import('../database/migration');
-        const migration = await DatabaseMigration.create(dbPath);
-        const result = await migration.migrateFromFiles();
+        const stats = docDatabase.getDocumentStats();
+        const isEmpty = stats.total === 0;
+        const forceSeeding = skipRestore; // Force seeding when SKIP_RESTORE=true
+        if (isEmpty || forceSeeding) {
+          if (forceSeeding) {
+            console.log('🔄 SKIP_RESTORE=true, forcing fresh seeding from files...');
+          } else {
+            console.log('📁 Database is empty, seeding from files...');
+          }
+          const { DatabaseMigration } = await import('../database/migration');
+          const migration = await DatabaseMigration.create(dbPath);
+          const result = await migration.migrateFromFiles();
           if (result.success) {
-          console.log(`✅ Seeded database: ${result.personasCount} personas, ${result.templatesCount} templates, ${result.moodsCount} moods, ${result.scenariosCount} scenarios`);
+            console.log(`✅ Seeded database: ${result.personasCount} personas, ${result.templatesCount} templates, ${result.moodsCount} moods, ${result.scenariosCount} scenarios`);
+            // Close migration DB to flush writes
+            migration.close();
+            console.log('🔄 Reloading a fresh database instance to pick up migration changes...');
+            // Do NOT close the existing factory DB (which would overwrite the file)
+            const reloadedDb = await DocumentDatabase.create(dbPath, false);
+            docDatabase = reloadedDb;
+
+            console.log('🔍 Verifying seeded data after reload:');
+            const reloadedStats = docDatabase.getDocumentStats();
+            console.log(`📊 Reloaded stats: ${reloadedStats.total} documents (${reloadedStats.personas} personas, ${reloadedStats.templates} templates, ${reloadedStats.moods} moods, ${reloadedStats.scenarios} scenarios)`);
+            if (reloadedStats.total === 0) {
+              console.warn('⚠️  Warning: No documents found after reload.');
+            } else {
+              console.log('✅ Seeded data accessible after reload');
+            }
+          } else {
+            console.warn(`⚠️  Seeding completed with ${result.errors.length} errors`);
+            migration.close();
+          }
         } else {
-          console.warn(`⚠️  Seeding completed with ${result.errors.length} errors`);
+          console.log(`🗃️  Database already populated (${stats.total} documents), skipping seed`);
         }
-      } else {
-        console.log(`🗃️  Database already populated (${stats.total} documents), skipping seed`);
-      }
-      
-      // Set the database instance (this was incorrectly indented inside the if block)
-      this.database = docDatabase;
-      
-      // Initialize DocumentService with the database
-      this.documentService = new DocumentService(docDatabase);
-      console.log('📋 DocumentService initialized successfully');
-      
-      console.log('✅ Database ready for CRUD operations');
-      
+  
+        // Set the database instance after seeding or skip
+        this.database = docDatabase;
+         
+         // Initialize DocumentService with the database
+         this.documentService = new DocumentService(docDatabase);
+         console.log('📋 DocumentService initialized successfully');
+         
+         console.log('✅ Database ready for CRUD operations');
+         
     } catch (error) {
       this.initializationError = error as Error;
       console.error('❌ Database initialization failed:', error);

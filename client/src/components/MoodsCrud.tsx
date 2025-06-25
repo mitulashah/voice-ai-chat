@@ -165,17 +165,20 @@ export const MoodsCrud: React.FC = () => {  const {
           <AddIcon fontSize="small" />
         </IconButton>
       </Box>      {/* Moods grid */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 0.5, mb: 2 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 0.5, mb: 2 }}>
         {moods.map(m => (
           <Box
             key={m.id}
             onClick={() => setSelectedMood(m)}
-            onContextMenu={(e) => handleContextMenu(e, m)}
-            sx={{
+            onContextMenu={(e) => handleContextMenu(e, m)}            sx={{
               p: 0.75,
               cursor: 'pointer',
               borderRadius: 1,
-              border: `2px solid ${theme.palette.warning.main}`,              textAlign: 'center',
+              border: `2px solid ${theme.palette.warning.main}`,
+              textAlign: 'center',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               background: selectedMood?.id === m.id 
                 ? theme.palette.warning.light + '40'  // Selected: light orange
                 : 'transparent',  // Not selected: transparent
@@ -185,13 +188,15 @@ export const MoodsCrud: React.FC = () => {  const {
                 background: theme.palette.warning.light + '20',
               },
             }}
-          >            <Typography 
+          >
+            <Typography 
               variant="body2" 
               sx={{ 
                 fontWeight: 500, 
                 fontSize: '0.75rem', // Match original MenuBar mood name size
                 lineHeight: 1.1,
-                color: theme.palette.warning.main
+                color: theme.palette.warning.main,
+                textAlign: 'center'
               }}
             >
               {m.mood}

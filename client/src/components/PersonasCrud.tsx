@@ -162,18 +162,20 @@ export const PersonasCrud: React.FC = () => {
           <AddIcon fontSize="small" />
         </IconButton>
       </Box>      {/* Personas grid */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 0.5, mb: 2 }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 0.5, mb: 2 }}>
         {personas.map(p => (
           <Box
             key={p.id}
             onClick={() => setSelectedPersona(p)}
-            onContextMenu={(e) => handleContextMenu(e, p)}
-            sx={{
+            onContextMenu={(e) => handleContextMenu(e, p)}            sx={{
               p: 0.75,
               cursor: 'pointer',
               borderRadius: 1,
               border: `2px solid ${theme.palette.primary.main}`,
               textAlign: 'center',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               background: selectedPersona?.id === p.id 
                 ? theme.palette.primary.light + '20'
                 : 'transparent',
@@ -187,16 +189,18 @@ export const PersonasCrud: React.FC = () => {
               variant="body2" 
               sx={{ 
                 fontWeight: 500, 
-                fontSize: '0.75rem', // Match original MenuBar persona name size
-                lineHeight: 1.1,
-                color: theme.palette.primary.main
+                fontSize: '0.75rem', // Match original MenuBar persona name size                lineHeight: 1.1,
+                color: theme.palette.primary.main,
+                textAlign: 'center'
               }}
             >
               {p.name}
             </Typography>
           </Box>
         ))}
-      </Box>      {/* Context Menu */}
+      </Box>
+
+      {/* Context Menu */}
       <Menu
         open={contextMenu !== null}
         onClose={handleCloseContextMenu}
