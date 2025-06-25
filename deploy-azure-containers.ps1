@@ -1,29 +1,19 @@
-# Voice AI Chat - Azure Container Apps Deployment Script
-# This script builds and deploys client and server containers to Azure Container Apps
-# Assumes: Container Apps Environment, Storage Account, Key Vault already exist
+# Voice AI Chat - Azure App Service (Container) Deployment Script
+# This script builds and deploys client and server containers to Azure App Service (Linux)
+# Assumes: App Service Plan, Storage Account, Key Vault, and ACR already exist
 # Requires: Azure CLI, PowerShell 7+, appropriate Azure permissions
 #
 # USAGE EXAMPLE:
-# .\deploy-azure-containers.ps1 `
-#     -SubscriptionId "12345678-1234-1234-1234-123456789012" `
-#     -ResourceGroupName "voice-ai-rg" `
-#     -EnvironmentName "dev" `
-#     -Location "eastus" `
-#     -ContainerAppEnvironmentName "devcae" `
-#     -StorageAccountName "devst123456" `
-#     -KeyVaultName "devkv123456" `
+# .\deploy-azure-containers.ps1 \
+#     -SubscriptionId "12345678-1234-1234-1234-123456789012" \
+#     -ResourceGroupName "voice-ai-rg" \
+#     -AppServicePlanName "voice-ai-asp" \
+#     -ClientAppName "voice-ai-client" \
+#     -ServerAppName "voice-ai-server" \
+#     -Location "eastus" \
+#     -StorageAccountName "devst123456" \
+#     -KeyVaultName "devkv123456" \
 #     -AcrName "devacr123456"
-#
-# FOR REDEPLOY (just rebuild images and update apps):
-# .\deploy-azure-containers.ps1 `
-#     -SubscriptionId "12345678-1234-1234-1234-123456789012" `
-#     -ResourceGroupName "voice-ai-rg" `
-#     -EnvironmentName "dev" `
-#     -ContainerAppEnvironmentName "devcae" `
-#     -StorageAccountName "devst123456" `
-#     -KeyVaultName "devkv123456" `
-#     -AcrName "devacr123456" `
-#     -Redeploy
 #
 # IMPORTANT: Update the Azure service secrets in the configuration section below before running!
 
@@ -38,10 +28,13 @@ param(
     [string]$Location = "eastus",
     
     [Parameter(Mandatory=$true)]
-    [string]$EnvironmentName,
+    [string]$AppServicePlanName,
     
     [Parameter(Mandatory=$true)]
-    [string]$ContainerAppEnvironmentName,
+    [string]$ClientAppName,
+    
+    [Parameter(Mandatory=$true)]
+    [string]$ServerAppName,
     
     [Parameter(Mandatory=$true)]
     [string]$StorageAccountName,
@@ -50,10 +43,7 @@ param(
     [string]$KeyVaultName,
     
     [Parameter(Mandatory=$true)]
-    [string]$AcrName,
-    
-    [Parameter(Mandatory=$false)]
-    [switch]$Redeploy
+    [string]$AcrName
 )
 
 # =============================================================================
@@ -80,7 +70,7 @@ $AUTH_USERS = '[{"username":"demo","password":"demo123"}]'
 $SESSION_SECRET = (New-Guid).ToString().Replace('-', '')
 
 # =============================================================================
-# RESOURCE NAMING - Using existing resources and auto-generating container apps
+# RESOURCE NAMING
 # =============================================================================
 
 # Container Image Configuration
@@ -89,23 +79,12 @@ $SERVER_IMAGE_TAG = "latest"
 $CLIENT_IMAGE_NAME = "client"
 $SERVER_IMAGE_NAME = "server"
 
-# Container Apps Configuration (will be created)
-$CLIENT_APP_NAME = "${EnvironmentName}-client"
-$SERVER_APP_NAME = "${EnvironmentName}-server"
-$MANAGED_IDENTITY_NAME = "${EnvironmentName}-shared-identity"
-
 # Storage Container Names (assume containers exist in provided storage account)
 $DATABASE_CONTAINER_NAME = "data"
 $BACKUP_CONTAINER_NAME = "database-backups"
 
 # Application Configuration (Auto-generated - will be updated after server deployment)
-$VITE_API_URL = "https://${EnvironmentName}-server.placeholder.azurecontainerapps.io"
-
-# Log Analytics Configuration
-$LOG_ANALYTICS_WORKSPACE_NAME = "${EnvironmentName}log"
-
-# Application Configuration (Auto-generated - will be updated after server deployment)
-$VITE_API_URL = "https://${EnvironmentName}-server.placeholder.azurecontainerapps.io"
+$VITE_API_URL = "https://${ServerAppName}.azurewebsites.net"
 
 # =============================================================================
 # UTILITY FUNCTIONS
@@ -131,29 +110,6 @@ function Test-CommandExists($command) {
     catch {
         return $false
     }
-}
-
-function Wait-ForRoleAssignment($principalId, $scope, $roleName, $maxWaitMinutes = 5) {
-    Write-Info "Waiting for role assignment '$roleName' to propagate for principal $principalId..."
-    $maxWaitSeconds = $maxWaitMinutes * 60
-    $waitSeconds = 0
-    $intervalSeconds = 30
-    
-    do {
-        Start-Sleep -Seconds $intervalSeconds
-        $waitSeconds += $intervalSeconds
-        
-        $assignment = az role assignment list --assignee $principalId --scope $scope --role $roleName --query "[0]" -o json 2>$null | ConvertFrom-Json
-        if ($assignment) {
-            Write-Info "Role assignment propagated successfully"
-            return $true
-        }
-        
-        Write-Info "Still waiting... ($waitSeconds/$maxWaitSeconds seconds)"
-    } while ($waitSeconds -lt $maxWaitSeconds)
-    
-    Write-Error "Role assignment did not propagate within $maxWaitMinutes minutes"
-    return $false
 }
 
 # =============================================================================
@@ -202,11 +158,7 @@ Write-Info "Current Azure account: $currentAccount"
 # AZURE SETUP AND VALIDATION
 # =============================================================================
 
-if ($Redeploy) {
-    Write-Step "Redeploy Mode - Validating Basic Azure Context"
-} else {
-    Write-Step "Setting up Azure Context and Validating Existing Resources"
-}
+Write-Step "Setting up Azure Context and Validating Existing Resources"
 
 # Set subscription
 Write-Info "Setting subscription to: $SubscriptionId"
@@ -220,30 +172,28 @@ if ($rgExists -eq "false") {
     exit 1
 }
 
-if (-not $Redeploy) {
-    # Validate Container Apps Environment exists
-    Write-Info "Validating Container Apps Environment: $ContainerAppEnvironmentName"
-    $caeExists = az containerapp env show --name $ContainerAppEnvironmentName --resource-group $ResourceGroupName --query "name" -o tsv 2>$null
-    if (-not $caeExists) {
-        Write-Error "Container Apps Environment $ContainerAppEnvironmentName does not exist in resource group $ResourceGroupName"
-        exit 1
-    }
+# Validate App Service Plan exists
+Write-Info "Validating App Service Plan: $AppServicePlanName"
+$aspExists = az appservice plan show --name $AppServicePlanName --resource-group $ResourceGroupName --query "name" -o tsv 2>$null
+if (-not $aspExists) {
+    Write-Error "App Service Plan $AppServicePlanName does not exist in resource group $ResourceGroupName"
+    exit 1
+}
 
-    # Validate Storage Account exists
-    Write-Info "Validating Storage Account: $StorageAccountName"
-    $storageExists = az storage account show --name $StorageAccountName --resource-group $ResourceGroupName --query "name" -o tsv 2>$null
-    if (-not $storageExists) {
-        Write-Error "Storage Account $StorageAccountName does not exist in resource group $ResourceGroupName"
-        exit 1
-    }
+# Validate Storage Account exists
+Write-Info "Validating Storage Account: $StorageAccountName"
+$storageExists = az storage account show --name $StorageAccountName --resource-group $ResourceGroupName --query "name" -o tsv 2>$null
+if (-not $storageExists) {
+    Write-Error "Storage Account $StorageAccountName does not exist in resource group $ResourceGroupName"
+    exit 1
+}
 
-    # Validate Key Vault exists
-    Write-Info "Validating Key Vault: $KeyVaultName"
-    $kvExists = az keyvault show --name $KeyVaultName --resource-group $ResourceGroupName --query "name" -o tsv 2>$null
-    if (-not $kvExists) {
-        Write-Error "Key Vault $KeyVaultName does not exist in resource group $ResourceGroupName"
-        exit 1
-    }
+# Validate Key Vault exists
+Write-Info "Validating Key Vault: $KeyVaultName"
+$kvExists = az keyvault show --name $KeyVaultName --resource-group $ResourceGroupName --query "name" -o tsv 2>$null
+if (-not $kvExists) {
+    Write-Error "Key Vault $KeyVaultName does not exist in resource group $ResourceGroupName"
+    exit 1
 }
 
 # Validate ACR exists
@@ -258,100 +208,6 @@ if (-not $acrExists) {
 Write-Info "Getting ACR login server"
 $ACR_LOGIN_SERVER = az acr show --name $AcrName --resource-group $ResourceGroupName --query "loginServer" -o tsv
 
-if (-not $Redeploy) {
-    # Get current user object ID for Key Vault access
-    $CURRENT_USER_OBJECT_ID = az ad signed-in-user show --query "id" -o tsv
-}
-
-# =============================================================================
-# USER-ASSIGNED MANAGED IDENTITY (Skip in Redeploy mode)
-# =============================================================================
-
-if (-not $Redeploy) {
-    Write-Step "Creating User-Assigned Managed Identity"
-
-    Write-Info "Creating managed identity: $MANAGED_IDENTITY_NAME"
-    az identity create --resource-group $ResourceGroupName --name $MANAGED_IDENTITY_NAME --location $Location
-
-    Write-Info "Getting managed identity details"
-    $MANAGED_IDENTITY_ID = az identity show --resource-group $ResourceGroupName --name $MANAGED_IDENTITY_NAME --query "id" -o tsv
-    $MANAGED_IDENTITY_CLIENT_ID = az identity show --resource-group $ResourceGroupName --name $MANAGED_IDENTITY_NAME --query "clientId" -o tsv
-    $MANAGED_IDENTITY_PRINCIPAL_ID = az identity show --resource-group $ResourceGroupName --name $MANAGED_IDENTITY_NAME --query "principalId" -o tsv
-
-    Write-Info "Managed Identity ID: $MANAGED_IDENTITY_ID"
-    Write-Info "Managed Identity Client ID: $MANAGED_IDENTITY_CLIENT_ID"
-    Write-Info "Managed Identity Principal ID: $MANAGED_IDENTITY_PRINCIPAL_ID"
-
-    # =============================================================================
-    # ROLE ASSIGNMENTS
-    # =============================================================================
-
-    Write-Step "Setting up Role Assignments"
-
-    # Get resource IDs for role assignments
-    $ACR_RESOURCE_ID = az acr show --name $AcrName --resource-group $ResourceGroupName --query "id" -o tsv
-    $STORAGE_RESOURCE_ID = az storage account show --name $StorageAccountName --resource-group $ResourceGroupName --query "id" -o tsv
-
-    Write-Info "Assigning AcrPull role to managed identity"
-    az role assignment create `
-        --assignee $MANAGED_IDENTITY_PRINCIPAL_ID `
-        --role "AcrPull" `
-        --scope $ACR_RESOURCE_ID
-
-    Write-Info "Assigning Storage Blob Data Contributor role to managed identity"
-    az role assignment create `
-        --assignee $MANAGED_IDENTITY_PRINCIPAL_ID `
-        --role "Storage Blob Data Contributor" `
-        --scope $STORAGE_RESOURCE_ID
-
-    Write-Info "Assigning Storage Account Contributor role to managed identity"
-    az role assignment create `
-        --assignee $MANAGED_IDENTITY_PRINCIPAL_ID `
-        --role "Storage Account Contributor" `
-        --scope $STORAGE_RESOURCE_ID
-
-    # Wait for role assignments to propagate
-    Wait-ForRoleAssignment $MANAGED_IDENTITY_PRINCIPAL_ID $ACR_RESOURCE_ID "AcrPull"
-    Wait-ForRoleAssignment $MANAGED_IDENTITY_PRINCIPAL_ID $STORAGE_RESOURCE_ID "Storage Blob Data Contributor"
-
-    # =============================================================================
-    # KEY VAULT SECRETS SETUP
-    # =============================================================================
-
-    Write-Step "Setting up Key Vault Secrets"
-
-    Write-Info "Setting Key Vault access policies for managed identity"
-    # Access policy for managed identity
-    az keyvault set-policy `
-        --name $KeyVaultName `
-        --object-id $MANAGED_IDENTITY_PRINCIPAL_ID `
-        --secret-permissions get list
-
-    Write-Info "Creating/Updating Key Vault secrets"
-    az keyvault secret set --vault-name $KeyVaultName --name "azure-openai-endpoint" --value $AZURE_OPENAI_ENDPOINT
-    az keyvault secret set --vault-name $KeyVaultName --name "azure-openai-key" --value $AZURE_OPENAI_KEY
-    az keyvault secret set --vault-name $KeyVaultName --name "azure-openai-deployment" --value $AZURE_OPENAI_DEPLOYMENT
-    az keyvault secret set --vault-name $KeyVaultName --name "azure-openai-model" --value $AZURE_OPENAI_MODEL
-    az keyvault secret set --vault-name $KeyVaultName --name "azure-speech-key" --value $AZURE_SPEECH_KEY
-    az keyvault secret set --vault-name $KeyVaultName --name "azure-speech-region" --value $AZURE_SPEECH_REGION
-    az keyvault secret set --vault-name $KeyVaultName --name "azure-ai-foundry-project-endpoint" --value $AZURE_AI_FOUNDRY_PROJECT_ENDPOINT
-    az keyvault secret set --vault-name $KeyVaultName --name "azure-evaluation-agent-id" --value $AZURE_EVALUATION_AGENT_ID
-} else {
-    Write-Step "Redeploy Mode - Getting Existing Managed Identity"
-    
-    Write-Info "Getting existing managed identity details: $MANAGED_IDENTITY_NAME"
-    $MANAGED_IDENTITY_ID = az identity show --resource-group $ResourceGroupName --name $MANAGED_IDENTITY_NAME --query "id" -o tsv
-    $MANAGED_IDENTITY_CLIENT_ID = az identity show --resource-group $ResourceGroupName --name $MANAGED_IDENTITY_NAME --query "clientId" -o tsv
-    $MANAGED_IDENTITY_PRINCIPAL_ID = az identity show --resource-group $ResourceGroupName --name $MANAGED_IDENTITY_NAME --query "principalId" -o tsv
-
-    if (-not $MANAGED_IDENTITY_ID) {
-        Write-Error "Managed identity $MANAGED_IDENTITY_NAME does not exist. Please run without -Redeploy flag first."
-        exit 1
-    }
-
-    Write-Info "Using existing Managed Identity ID: $MANAGED_IDENTITY_ID"
-    Write-Info "Using existing Managed Identity Client ID: $MANAGED_IDENTITY_CLIENT_ID"
-}
 # =============================================================================
 # BUILD AND PUSH DOCKER IMAGES
 # =============================================================================
@@ -367,34 +223,92 @@ Write-Info "Building server image via ACR Build"
 az acr build --registry $AcrName --image "${SERVER_IMAGE_NAME}:${SERVER_IMAGE_TAG}" --file "server/Dockerfile" .
 
 # =============================================================================
-# DELETE EXISTING CONTAINER APPS (Redeploy mode only)
+# DEPLOY TO AZURE APP SERVICE (CONTAINER)
 # =============================================================================
 
-if ($Redeploy) {
-    Write-Step "Redeploy Mode - Deleting Existing Container Apps"
-    
-    # Check if client app exists and delete it
-    $clientExists = az containerapp show --name $CLIENT_APP_NAME --resource-group $ResourceGroupName --query "name" -o tsv 2>$null
-    if ($clientExists) {
-        Write-Info "Deleting existing client container app: $CLIENT_APP_NAME"
-        az containerapp delete --name $CLIENT_APP_NAME --resource-group $ResourceGroupName --yes
-    } else {
-        Write-Info "Client container app $CLIENT_APP_NAME does not exist, skipping deletion"
-    }
-    
-    # Check if server app exists and delete it
-    $serverExists = az containerapp show --name $SERVER_APP_NAME --resource-group $ResourceGroupName --query "name" -o tsv 2>$null
-    if ($serverExists) {
-        Write-Info "Deleting existing server container app: $SERVER_APP_NAME"
-        az containerapp delete --name $SERVER_APP_NAME --resource-group $ResourceGroupName --yes
-    } else {
-        Write-Info "Server container app $SERVER_APP_NAME does not exist, skipping deletion"
-    }
-    
-    # Wait a moment for deletions to complete
-    Write-Info "Waiting for container app deletions to complete..."
-    Start-Sleep -Seconds 30
+Write-Step "Deploying to Azure App Service (Linux Container)"
+
+# Create or update client web app
+Write-Info "Deploying Client Web App: $ClientAppName"
+$clientExists = az webapp show --name $ClientAppName --resource-group $ResourceGroupName --query "name" -o tsv 2>$null
+if ($clientExists) {
+    Write-Info "Client app exists, updating image and settings"
+    az webapp config container set --name $ClientAppName --resource-group $ResourceGroupName --docker-custom-image-name "${ACR_LOGIN_SERVER}/${CLIENT_IMAGE_NAME}:${CLIENT_IMAGE_TAG}" --docker-registry-server-url "https://${ACR_LOGIN_SERVER}"
+} else {
+    az webapp create --resource-group $ResourceGroupName --plan $AppServicePlanName --name $ClientAppName --deployment-container-image-name "${ACR_LOGIN_SERVER}/${CLIENT_IMAGE_NAME}:${CLIENT_IMAGE_TAG}"
 }
+az webapp config appsettings set --name $ClientAppName --resource-group $ResourceGroupName --settings "PORT=5173" "VITE_API_URL=$VITE_API_URL"
+
+# Create or update server web app
+Write-Info "Deploying Server Web App: $ServerAppName"
+$serverExists = az webapp show --name $ServerAppName --resource-group $ResourceGroupName --query "name" -o tsv 2>$null
+if ($serverExists) {
+    Write-Info "Server app exists, updating image and settings"
+    az webapp config container set --name $ServerAppName --resource-group $ResourceGroupName --docker-custom-image-name "${ACR_LOGIN_SERVER}/${SERVER_IMAGE_NAME}:${SERVER_IMAGE_TAG}" --docker-registry-server-url "https://${ACR_LOGIN_SERVER}"
+} else {
+    az webapp create --resource-group $ResourceGroupName --plan $AppServicePlanName --name $ServerAppName --deployment-container-image-name "${ACR_LOGIN_SERVER}/${SERVER_IMAGE_NAME}:${SERVER_IMAGE_TAG}"
+}
+Write-Info "Getting ACR login server"
+$ACR_LOGIN_SERVER = az acr show --name $AcrName --resource-group $ResourceGroupName --query "loginServer" -o tsv
+
+# Get current user object ID for Key Vault access
+$CURRENT_USER_OBJECT_ID = az ad signed-in-user show --query "id" -o tsv
+
+# =============================================================================
+# USER-ASSIGNED MANAGED IDENTITY (for App Service)
+# =============================================================================
+
+Write-Step "Creating or Getting User-Assigned Managed Identity"
+
+$MANAGED_IDENTITY_NAME = "${ServerAppName}-identity"
+$MANAGED_IDENTITY_ID = az identity show --resource-group $ResourceGroupName --name $MANAGED_IDENTITY_NAME --query "id" -o tsv 2>$null
+if (-not $MANAGED_IDENTITY_ID) {
+    Write-Info "Managed identity $MANAGED_IDENTITY_NAME does not exist. Creating..."
+    az identity create --resource-group $ResourceGroupName --name $MANAGED_IDENTITY_NAME --location $Location
+    $MANAGED_IDENTITY_ID = az identity show --resource-group $ResourceGroupName --name $MANAGED_IDENTITY_NAME --query "id" -o tsv
+} else {
+    Write-Info "Using existing managed identity: $MANAGED_IDENTITY_NAME"
+}
+$MANAGED_IDENTITY_CLIENT_ID = az identity show --resource-group $ResourceGroupName --name $MANAGED_IDENTITY_NAME --query "clientId" -o tsv
+$MANAGED_IDENTITY_PRINCIPAL_ID = az identity show --resource-group $ResourceGroupName --name $MANAGED_IDENTITY_NAME --query "principalId" -o tsv
+
+# Assign roles for Key Vault and Storage
+$STORAGE_RESOURCE_ID = az storage account show --name $StorageAccountName --resource-group $ResourceGroupName --query "id" -o tsv
+Write-Info "Assigning Storage Blob Data Contributor role to managed identity"
+az role assignment create --assignee $MANAGED_IDENTITY_PRINCIPAL_ID --role "Storage Blob Data Contributor" --scope $STORAGE_RESOURCE_ID
+
+Write-Info "Assigning Key Vault Secrets User role to managed identity"
+$KEYVAULT_RESOURCE_ID = az keyvault show --name $KeyVaultName --resource-group $ResourceGroupName --query "id" -o tsv
+az role assignment create --assignee $MANAGED_IDENTITY_PRINCIPAL_ID --role "Key Vault Secrets User" --scope $KEYVAULT_RESOURCE_ID
+
+# Set Key Vault access policy for legacy SDKs if needed
+az keyvault set-policy --name $KeyVaultName --object-id $MANAGED_IDENTITY_PRINCIPAL_ID --secret-permissions get list
+
+# =============================================================================
+# ASSIGN MANAGED IDENTITY TO APP SERVICES
+# =============================================================================
+
+Write-Step "Assigning Managed Identity to App Services"
+az webapp identity assign --resource-group $ResourceGroupName --name $ClientAppName --identities $MANAGED_IDENTITY_ID
+az webapp identity assign --resource-group $ResourceGroupName --name $ServerAppName --identities $MANAGED_IDENTITY_ID
+
+# Set environment variable for client ID in both apps (if needed by app code)
+az webapp config appsettings set --name $ClientAppName --resource-group $ResourceGroupName --settings "AZURE_CLIENT_ID=$MANAGED_IDENTITY_CLIENT_ID"
+az webapp config appsettings set --name $ServerAppName --resource-group $ResourceGroupName --settings "AZURE_CLIENT_ID=$MANAGED_IDENTITY_CLIENT_ID"
+
+# =============================================================================
+# BUILD AND PUSH DOCKER IMAGES
+# =============================================================================
+
+Write-Step "Building and Pushing Docker Images"
+
+# Build client image
+Write-Info "Building client image via ACR Build"
+az acr build --registry $AcrName --image "${CLIENT_IMAGE_NAME}:${CLIENT_IMAGE_TAG}" --file "client/Dockerfile" .
+
+# Build server image
+Write-Info "Building server image via ACR Build"
+az acr build --registry $AcrName --image "${SERVER_IMAGE_NAME}:${SERVER_IMAGE_TAG}" --file "server/Dockerfile" .
 
 # =============================================================================
 # DEPLOY CONTAINER APPS
@@ -485,39 +399,23 @@ Write-Step "Deployment Complete - Retrieving Information"
 $CLIENT_URL = az containerapp show --name $CLIENT_APP_NAME --resource-group $ResourceGroupName --query "properties.configuration.ingress.fqdn" -o tsv
 
 Write-Host "`n==============================================================================" -ForegroundColor Green
-if ($Redeploy) {
-    Write-Host "REDEPLOY COMPLETED SUCCESSFULLY" -ForegroundColor Green
-} else {
-    Write-Host "DEPLOYMENT COMPLETED SUCCESSFULLY" -ForegroundColor Green
-}
+Write-Host "DEPLOYMENT COMPLETED SUCCESSFULLY" -ForegroundColor Green
 Write-Host "==============================================================================" -ForegroundColor Green
 Write-Host ""
 Write-Host "Resource Group: $ResourceGroupName" -ForegroundColor Yellow
 Write-Host "Location: $Location" -ForegroundColor Yellow
 Write-Host "Environment: $EnvironmentName" -ForegroundColor Yellow
 Write-Host ""
-if ($Redeploy) {
-    Write-Host "Redeploy Mode - Updated Resources:" -ForegroundColor Yellow
-    Write-Host "  Client Container App: $CLIENT_APP_NAME (rebuilt and redeployed)" -ForegroundColor White
-    Write-Host "  Server Container App: $SERVER_APP_NAME (rebuilt and redeployed)" -ForegroundColor White
-    Write-Host "  Docker Images: ${CLIENT_IMAGE_NAME}:${CLIENT_IMAGE_TAG}, ${SERVER_IMAGE_NAME}:${SERVER_IMAGE_TAG}" -ForegroundColor White
-    Write-Host ""
-    Write-Host "Existing Resources Used:" -ForegroundColor Yellow
-    Write-Host "  Container Registry: $AcrName" -ForegroundColor White
-    Write-Host "  Managed Identity: $MANAGED_IDENTITY_NAME" -ForegroundColor White
-    Write-Host "  Container Apps Environment: $ContainerAppEnvironmentName" -ForegroundColor White
-} else {
-    Write-Host "Existing Resources Used:" -ForegroundColor Yellow
-    Write-Host "  Container Registry: $AcrName" -ForegroundColor White
-    Write-Host "  Storage Account: $StorageAccountName" -ForegroundColor White
-    Write-Host "  Key Vault: $KeyVaultName" -ForegroundColor White
-    Write-Host "  Container Apps Environment: $ContainerAppEnvironmentName" -ForegroundColor White
-    Write-Host ""
-    Write-Host "Created Resources:" -ForegroundColor Yellow
-    Write-Host "  Managed Identity: $MANAGED_IDENTITY_NAME" -ForegroundColor White
-    Write-Host "  Client Container App: $CLIENT_APP_NAME" -ForegroundColor White
-    Write-Host "  Server Container App: $SERVER_APP_NAME" -ForegroundColor White
-}
+Write-Host "Existing Resources Used:" -ForegroundColor Yellow
+Write-Host "  Container Registry: $AcrName" -ForegroundColor White
+Write-Host "  Storage Account: $StorageAccountName" -ForegroundColor White
+Write-Host "  Key Vault: $KeyVaultName" -ForegroundColor White
+Write-Host "  Container Apps Environment: $ContainerAppEnvironmentName" -ForegroundColor White
+Write-Host ""
+Write-Host "Created Resources:" -ForegroundColor Yellow
+Write-Host "  Managed Identity: $MANAGED_IDENTITY_NAME" -ForegroundColor White
+Write-Host "  Client Container App: $CLIENT_APP_NAME" -ForegroundColor White
+Write-Host "  Server Container App: $SERVER_APP_NAME" -ForegroundColor White
 Write-Host ""
 Write-Host "Application URLs:" -ForegroundColor Cyan
 Write-Host "  Client:  https://$CLIENT_URL" -ForegroundColor White
