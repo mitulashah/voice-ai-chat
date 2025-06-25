@@ -23,13 +23,13 @@ resource "azurerm_container_registry" "acr" {
 
 # Key Vault
 resource "azurerm_key_vault" "kv" {
-  name                        = "${var.environment_name}kv${random_string.acr_suffix.result}"
-  location                    = var.location
-  resource_group_name         = azurerm_resource_group.main.name
-  tenant_id                   = data.azurerm_client_config.current.tenant_id
-  sku_name                    = "standard"
-  purge_protection_enabled    = true
-  enable_rbac_authorization   = false
+  name                      = "${var.environment_name}kv${random_string.acr_suffix.result}"
+  location                  = var.location
+  resource_group_name       = azurerm_resource_group.main.name
+  tenant_id                 = data.azurerm_client_config.current.tenant_id
+  sku_name                  = "standard"
+  purge_protection_enabled  = true
+  enable_rbac_authorization = false
 }
 
 # Log Analytics Workspace
@@ -63,20 +63,29 @@ resource "azurerm_storage_account" "voice_ai_storage" {
   location                 = azurerm_resource_group.main.location
   account_tier             = "Standard"
   account_replication_type = "LRS"
-  
+
   tags = {
     Environment = var.environment_name
     Purpose     = "SQLite Database Storage"
   }
 }
 
-resource "azurerm_storage_share" "database_share" {
-  name                 = "database"
-  storage_account_name = azurerm_storage_account.voice_ai_storage.name
-  quota                = var.database_storage_quota_gb
-  
-  depends_on = [azurerm_storage_account.voice_ai_storage]
+resource "azurerm_storage_container" "blob_container" {
+  name                  = "data"
+  storage_account_name  = azurerm_storage_account.voice_ai_storage.name
+  container_access_type = "private"
+  depends_on            = [azurerm_storage_account.voice_ai_storage]
 }
+
+# Database backups blob container
+resource "azurerm_storage_container" "database_backups" {
+  name                  = "database-backups"
+  storage_account_name  = azurerm_storage_account.voice_ai_storage.name
+  container_access_type = "private"
+  depends_on            = [azurerm_storage_account.voice_ai_storage]
+}
+
+
 
 # Container Apps Environment
 resource "azurerm_container_app_environment" "cae" {
@@ -86,15 +95,7 @@ resource "azurerm_container_app_environment" "cae" {
   log_analytics_workspace_id = azurerm_log_analytics_workspace.log.id
 }
 
-# Container App Environment Storage for SQLite database
-resource "azurerm_container_app_environment_storage" "database_storage" {
-  name                         = "database-storage"
-  container_app_environment_id = azurerm_container_app_environment.cae.id
-  account_name                 = azurerm_storage_account.voice_ai_storage.name
-  share_name                   = azurerm_storage_share.database_share.name
-  access_key                   = azurerm_storage_account.voice_ai_storage.primary_access_key
-  access_mode                  = "ReadWrite"
-}
+
 
 # Create a user-assigned managed identity
 resource "azurerm_user_assigned_identity" "shared" {
@@ -104,11 +105,11 @@ resource "azurerm_user_assigned_identity" "shared" {
 }
 
 resource "azurerm_key_vault_access_policy" "shared" {
-  key_vault_id = azurerm_key_vault.kv.id
-  tenant_id    = data.azurerm_client_config.current.tenant_id
-  object_id    = azurerm_user_assigned_identity.shared.principal_id
+  key_vault_id       = azurerm_key_vault.kv.id
+  tenant_id          = data.azurerm_client_config.current.tenant_id
+  object_id          = azurerm_user_assigned_identity.shared.principal_id
   secret_permissions = ["Get", "List"]
-  depends_on = [azurerm_user_assigned_identity.shared]
+  depends_on         = [azurerm_user_assigned_identity.shared]
 }
 
 resource "azurerm_role_assignment" "shared_acr_pull" {
@@ -118,13 +119,15 @@ resource "azurerm_role_assignment" "shared_acr_pull" {
   depends_on           = [azurerm_user_assigned_identity.shared, azurerm_container_registry.acr]
 }
 
-# Role assignment for Azure Files access
-resource "azurerm_role_assignment" "shared_storage_file_data_contributor" {
+# Role assignment for Azure Blob Storage access
+resource "azurerm_role_assignment" "shared_storage_blob_data_contributor" {
   principal_id         = azurerm_user_assigned_identity.shared.principal_id
-  role_definition_name = "Storage File Data SMB Share Contributor"
+  role_definition_name = "Storage Blob Data Contributor"
   scope                = azurerm_storage_account.voice_ai_storage.id
   depends_on           = [azurerm_user_assigned_identity.shared, azurerm_storage_account.voice_ai_storage]
 }
+
+
 
 # Alternative: Storage Account Contributor for broader access
 resource "azurerm_role_assignment" "shared_storage_account_contributor" {
@@ -136,14 +139,14 @@ resource "azurerm_role_assignment" "shared_storage_account_contributor" {
 
 # Add a delay to allow RBAC propagation for AcrPull role assignment
 resource "time_sleep" "acr_rbac_propagation" {
-  depends_on = [azurerm_role_assignment.shared_acr_pull]
+  depends_on      = [azurerm_role_assignment.shared_acr_pull]
   create_duration = "120s"
 }
 
 # Add a delay to allow RBAC propagation for storage role assignments
 resource "time_sleep" "storage_rbac_propagation" {
   depends_on = [
-    azurerm_role_assignment.shared_storage_file_data_contributor,
+    azurerm_role_assignment.shared_storage_blob_data_contributor,
     azurerm_role_assignment.shared_storage_account_contributor
   ]
   create_duration = "60s"
@@ -220,7 +223,7 @@ resource "azurerm_container_app" "client" {
   }
 
   ingress {
-    external_enabled            = true
+    external_enabled           = true
     target_port                = 80
     transport                  = "auto"
     allow_insecure_connections = false
@@ -283,27 +286,17 @@ resource "azurerm_container_app" "server" {
     name  = "azure-evaluation-agent-id"
     value = azurerm_key_vault_secret.azure_evaluation_agent_id.value
   }
+
   template {
-    volume {
-      name         = "database-volume"
-      storage_type = "AzureFile"
-      storage_name = azurerm_container_app_environment_storage.database_storage.name
-    }
-    
     container {
       name   = "server"
       image  = "${azurerm_container_registry.acr.login_server}/server:${var.server_image_tag}"
       cpu    = 0.5
       memory = "1.0Gi"
-      
-      volume_mounts {
-        name = "database-volume"
-        path = "/app/data"
-      }
-      
+
       env {
-        name        = "PORT"
-        value       = "3000"
+        name  = "PORT"
+        value = "5000"
       }
       env {
         name  = "USE_SEED_DATA_MODE"
@@ -311,7 +304,7 @@ resource "azurerm_container_app" "server" {
       }
       env {
         name  = "DATABASE_PATH"
-        value = "/app/data/voice-ai-documents.db"
+        value = "/app/voice-ai-documents.db"
       }
       env {
         name        = "AZURE_OPENAI_ENDPOINT"
@@ -332,7 +325,7 @@ resource "azurerm_container_app" "server" {
       env {
         name        = "AZURE_SPEECH_KEY"
         secret_name = "azure-speech-key"
-      }      
+      }
       env {
         name        = "AZURE_SPEECH_REGION"
         secret_name = "azure-speech-region"
@@ -344,14 +337,42 @@ resource "azurerm_container_app" "server" {
       env {
         name        = "AZURE_EVALUATION_AGENT_ID"
         secret_name = "azure-evaluation-agent-id"
+      }      
+      env {
+        name  = "MESSAGE_WINDOW_SIZE"
+        value = "20"
       }
       env {
-        name        = "MESSAGE_WINDOW_SIZE"
-        value       = "20"
+        name  = "NODE_ENV"
+        value = "production"
+      }
+      env {
+        name  = "AUTH_ENABLED"
+        value = "true"
+      }
+      env {
+        name  = "SESSION_SECRET"
+        value = "e3088c150a170f9ed9479856938b206b4f8a02fb4a409a53a80a5af224d6a7de"
+      }
+      env {
+        name  = "AUTH_USERS"
+        value = "[{\"username\":\"demo\",\"password\":\"demo123\"}]"
+      }
+      env {
+        name  = "AZURE_STORAGE_ACCOUNT_NAME"
+        value = azurerm_storage_account.voice_ai_storage.name
+      }
+      env {
+        name  = "CONTAINER_APP_NAME"
+        value = "${var.environment_name}-server"
       }
       env {
         name  = "AZURE_CLIENT_ID"
         value = azurerm_user_assigned_identity.shared.client_id
+      }
+      env {
+        name  = "SKIP_RESTORE"
+        value = "false"
       }
     }
     min_replicas = 1
@@ -360,10 +381,10 @@ resource "azurerm_container_app" "server" {
   depends_on = [time_sleep.acr_rbac_propagation, time_sleep.storage_rbac_propagation]
 
   ingress {
-    external_enabled            = true
-    target_port                 = 3000
-    transport                   = "auto"
-    allow_insecure_connections  = false
+    external_enabled           = true
+    target_port                = 3000
+    transport                  = "auto"
+    allow_insecure_connections = false
     traffic_weight {
       latest_revision = true
       percentage      = 100
@@ -372,11 +393,11 @@ resource "azurerm_container_app" "server" {
 }
 
 resource "azurerm_key_vault_access_policy" "deployer" {
-  key_vault_id = azurerm_key_vault.kv.id
-  tenant_id    = data.azurerm_client_config.current.tenant_id
-  object_id    = var.deployer_object_id
+  key_vault_id       = azurerm_key_vault.kv.id
+  tenant_id          = data.azurerm_client_config.current.tenant_id
+  object_id          = var.deployer_object_id
   secret_permissions = ["Get", "List", "Set", "Delete"]
-  depends_on = [azurerm_key_vault.kv, azurerm_container_registry.acr]
+  depends_on         = [azurerm_key_vault.kv, azurerm_container_registry.acr]
 }
 
 # Key Vault Secrets (names must be lowercase, alphanumeric, and dashes only)

@@ -19,6 +19,7 @@ $acrName = $acrLoginServer.Split('.')[0]
 Write-Host "ACR_NAME is [$acrName]"
 
 # Set image tags
+# TODO: Consider using unique image tags (e.g., timestamp or commit hash) for better tracking and deployment reliability
 $clientImage = "client:latest"
 $serverImage = "server:latest"
 
@@ -35,13 +36,13 @@ if ($Redeploy) {
     az containerapp delete --name $serverAppName --resource-group $resourceGroup --yes
 }
 
-# Build and push client image using ACR Tasks
-Write-Host "Building and pushing client image using az acr build..."
-az acr build --registry $acrName --image $clientImage --platform linux/amd64 ./client
-
 # Build and push server image using ACR Tasks
 Write-Host "Building and pushing server image using az acr build..."
 az acr build --registry $acrName --image $serverImage --platform linux/amd64 ./server
+
+# Build and push client image using ACR Tasks (no API URL needed - configured at runtime)
+Write-Host "Building and pushing client image using az acr build..."
+az acr build --registry $acrName --image $clientImage --platform linux/amd64 ./client
 
 if ($Redeploy) {
     Write-Host "Recreating container apps using Azure CLI..."

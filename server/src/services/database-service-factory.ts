@@ -126,26 +126,33 @@ export class DatabaseServiceFactory {
 
     this.initializationPromise = this._initializeWithSeedData();
     return this.initializationPromise;
-  }
-  private async _initializeWithSeedData(): Promise<void> {
+  }  private async _initializeWithSeedData(): Promise<void> {
     try {
       console.log('🗃️  Initializing database with seed data approach...');
       
       // Always use DocumentDatabase (no file watchers)
       const dbPath = this.config.dbPath || path.join(process.cwd(), 'data', 'voice-ai-documents.db');
-      const docDatabase = await DocumentDatabase.create(dbPath);
-        // Check if database is empty (needs seeding)
+      
+      // Check SKIP_RESTORE environment variable
+      const skipRestore = process.env.SKIP_RESTORE === 'true';
+      console.log(`🔄 SKIP_RESTORE environment variable: ${skipRestore}`);
+        const docDatabase = await DocumentDatabase.create(dbPath, skipRestore);
+        // Check if database is empty (needs seeding) OR if SKIP_RESTORE is true (force fresh seeding)
       const stats = docDatabase.getDocumentStats();
       const isEmpty = stats.total === 0;
+      const forceSeeding = skipRestore; // Force seeding when SKIP_RESTORE=true
       
-      if (isEmpty) {
-        console.log('📁 Database is empty, seeding from files...');
+      if (isEmpty || forceSeeding) {
+        if (forceSeeding) {
+          console.log('🔄 SKIP_RESTORE=true, forcing fresh seeding from files...');
+        } else {
+          console.log('📁 Database is empty, seeding from files...');
+        }
         const { DatabaseMigration } = await import('../database/migration');
         const migration = await DatabaseMigration.create(dbPath);
         const result = await migration.migrateFromFiles();
-        
-        if (result.success) {
-          console.log(`✅ Seeded database: ${result.personasCount} personas, ${result.templatesCount} templates`);
+          if (result.success) {
+          console.log(`✅ Seeded database: ${result.personasCount} personas, ${result.templatesCount} templates, ${result.moodsCount} moods, ${result.scenariosCount} scenarios`);
         } else {
           console.warn(`⚠️  Seeding completed with ${result.errors.length} errors`);
         }

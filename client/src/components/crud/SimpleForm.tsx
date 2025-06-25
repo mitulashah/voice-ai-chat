@@ -40,7 +40,7 @@ const SimpleForm = forwardRef<SimpleFormRef, SimpleFormProps>(({
   useEffect(() => {
     setFormData(initialData);
     setErrors({});
-  }, [initialData]);
+  }, []); // run once on mount, remove initialData dep to prevent infinite update loop
   const validateField = (field: FormField, value: string): string | null => {
     if (field.required && value.trim().length === 0) {
       return `${field.label} is required`;

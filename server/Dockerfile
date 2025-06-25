@@ -24,5 +24,8 @@ COPY --from=builder /app/src/scenarios ./dist/scenarios
 COPY --from=builder /app/src/util ./dist/util
 # Ensure data directory exists and is writable
 RUN mkdir -p ./data && chmod 777 ./data
+# Copy startup script
+COPY startup.sh .
+RUN chmod +x startup.sh
 EXPOSE 5000
-CMD ["node", "dist/index.js"]
+CMD ["./startup.sh"]

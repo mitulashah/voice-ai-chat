@@ -83,14 +83,19 @@ variable "deployer_object_id" {
   type        = string
 }
 
-variable "vite_api_url" {
-  description = "API URL for the client app (used as VITE_API_URL)."
-  type        = string
-  default     = ""
-}
-
 variable "database_storage_quota_gb" {
   description = "Storage quota in GB for the SQLite database file share."
   type        = number
   default     = 5
+}
+
+variable "deployer_ip_address" {
+  description = "IP address of the deployer to allow Key Vault access during deployment"
+  type        = string
+  default     = null
+}
+
+variable "vite_api_url" {
+  description = "API URL for the Vite client application."
+  type        = string
 }

@@ -32,23 +32,29 @@ output "storage_account_primary_connection_string" {
   description = "Primary connection string for the storage account"
 }
 
-output "database_file_share_name" {
-  value       = azurerm_storage_share.database_share.name
-  description = "Name of the Azure File Share used for SQLite database storage"
+output "database_blob_container_name" {
+  value       = azurerm_storage_container.database_backups.name
+  description = "Name of the blob container used for database backups"
 }
 
-output "database_file_share_url" {
-  value       = azurerm_storage_share.database_share.url
-  description = "URL of the Azure File Share used for SQLite database storage"
-}
-
-# Container App URLs
+# Container App URLs (using stable ingress FQDN)
 output "server_container_app_url" {
-  value       = "https://${azurerm_container_app.server.latest_revision_fqdn}"
-  description = "URL of the server container app"
+  value       = "https://${azurerm_container_app.server.ingress[0].fqdn}"
+  description = "URL of the server container app (stable URL)"
 }
 
 output "client_container_app_url" {
-  value       = "https://${azurerm_container_app.client.latest_revision_fqdn}"
-  description = "URL of the client container app"
+  value       = "https://${azurerm_container_app.client.ingress[0].fqdn}"
+  description = "URL of the client container app (stable URL)"
+}
+
+# Managed Identity outputs
+output "managed_identity_client_id" {
+  value       = azurerm_user_assigned_identity.shared.client_id
+  description = "Client ID of the managed identity used for blob storage access"
+}
+
+output "managed_identity_principal_id" {
+  value       = azurerm_user_assigned_identity.shared.principal_id
+  description = "Principal ID of the managed identity used for blob storage access"
 }

@@ -7,22 +7,33 @@ import type { Persona } from '../types/api';
  * Get all personas - uses DocumentService if available, falls back to database or files
  */
 export async function getAllPersonas(dbInstance?: any): Promise<Persona[]> {
-  try {    // Try DocumentService first
+  try {    
+    // Try DocumentService first
     const documentService = databaseServiceFactory.getDocumentService();
+    console.log('DocumentService available:', !!documentService);
+    
     if (documentService) {
-      return await documentService.listPersonas();
+      const personas = await documentService.listPersonas();
+      console.log('DocumentService returned personas count:', personas.length);
+      return personas;
     }
     
     // Fallback to database
     const db = dbInstance ?? (databaseServiceFactory.shouldUseDatabase() ? databaseServiceFactory.getDatabase() : null);
+    console.log('Database available:', !!db);
+    
     if (db) {
       const personas: any[] = db.getAllPersonas();
+      console.log('Database returned personas count:', personas.length);
       return personas.map((persona: any): Persona => ({
         ...persona
       }));
     }
+    
+    console.log('Falling back to file-based personas');
     return getPersonasFromFiles();
   } catch (error) {
+    console.error('Error in getAllPersonas:', error);
     return getPersonasFromFiles();
   }
 }

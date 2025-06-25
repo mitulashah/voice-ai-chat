@@ -11,14 +11,21 @@ export async function getAllTemplates(dbInstance?: any): Promise<Template[]> {
   try {
     // Try DocumentService first
     const documentService = databaseServiceFactory.getDocumentService();
+    console.log('DocumentService available (templates):', !!documentService);
+    
     if (documentService) {
-      return await documentService.listTemplates();
+      const templates = await documentService.listTemplates();
+      console.log('DocumentService returned templates count:', templates.length);
+      return templates;
     }
     
     // Fallback to database
     const db = dbInstance ?? (databaseServiceFactory.shouldUseDatabase() ? databaseServiceFactory.getDatabase() : null);
+    console.log('Database available (templates):', !!db);
+    
     if (db) {
       const templates: any[] = db.getAllTemplates();
+      console.log('Database returned templates count:', templates.length);
       return templates.map((template: any): Template => ({
         id: template.id || template.name,
         name: template.metadata?.name || template.name,

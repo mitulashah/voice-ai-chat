@@ -111,7 +111,6 @@ export class DocumentService {
     
     return updated;
   }
-
   async deleteMood(id: string): Promise<void> {
     const existing = await this.getMood(id);
     if (!existing) {
@@ -119,7 +118,9 @@ export class DocumentService {
     }
     
     this.db.deleteMood(id);
-  }  async listMoods(): Promise<Mood[]> {
+  }
+
+  async listMoods(): Promise<Mood[]> {
     // Convert the existing getAllMoods format to the new Mood interface
     const existingMoods = this.db.getAllMoods();
     return existingMoods.map((m: { mood: string; description: string }) => ({

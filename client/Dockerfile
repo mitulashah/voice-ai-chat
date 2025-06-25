@@ -4,10 +4,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
-
-# Accept VITE_API_URL as a build argument
-ARG VITE_API_URL
-ENV VITE_API_URL=$VITE_API_URL
+# No need for VITE_API_URL build arg - we'll configure at runtime
 RUN npm run build
 
 # Stage 2: Serve static files
@@ -15,5 +12,8 @@ FROM nginx:alpine
 WORKDIR /usr/share/nginx/html
 COPY --from=builder /app/dist .
 COPY ./nginx.conf /etc/nginx/nginx.conf
+# Copy startup script
+COPY startup.sh /startup.sh
+RUN chmod +x /startup.sh
 EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["/startup.sh"]
