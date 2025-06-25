@@ -2,7 +2,8 @@
   "name": "client",
   "private": true,
   "version": "0.0.0",
-  "type": "module",  "scripts": {
+  "type": "module",
+  "scripts": {
     "dev": "node replace-env-vars.mjs && vite",
     "build": "tsc -b && vite build",
     "build:docker": "tsc -b && vite build",

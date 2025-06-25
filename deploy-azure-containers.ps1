@@ -4,15 +4,15 @@
 # Requires: Azure CLI, PowerShell 7+, appropriate Azure permissions
 #
 # USAGE EXAMPLE:
-# .\deploy-azure-containers.ps1 \
-#     -SubscriptionId "12345678-1234-1234-1234-123456789012" \
-#     -ResourceGroupName "voice-ai-rg" \
-#     -AppServicePlanName "voice-ai-asp" \
-#     -ClientAppName "voice-ai-client" \
-#     -ServerAppName "voice-ai-server" \
-#     -Location "eastus" \
-#     -StorageAccountName "devst123456" \
-#     -KeyVaultName "devkv123456" \
+# .\deploy-azure-containers.ps1 `
+#     -SubscriptionId "12345678-1234-1234-1234-123456789012" `
+#     -ResourceGroupName "voice-ai-rg" `
+#     -AppServicePlanName "voice-ai-asp" `
+#     -ClientAppName "voice-ai-client" `
+#     -ServerAppName "voice-ai-server" `
+#     -Location "eastus" `
+#     -StorageAccountName "devst123456" `
+#     -KeyVaultName "devkv123456" `
 #     -AcrName "devacr123456"
 #
 # IMPORTANT: Update the Azure service secrets in the configuration section below before running!
@@ -418,20 +418,20 @@ Write-Host "  Client Container App: $CLIENT_APP_NAME" -ForegroundColor White
 Write-Host "  Server Container App: $SERVER_APP_NAME" -ForegroundColor White
 Write-Host ""
 Write-Host "Application URLs:" -ForegroundColor Cyan
-Write-Host "  Client:  https://$CLIENT_URL" -ForegroundColor White
-Write-Host "  Server:  https://$SERVER_URL" -ForegroundColor White
+Write-Host "  Client:  https://$ClientAppName.azurewebsites.net" -ForegroundColor White
+Write-Host "  Server:  https://$ServerAppName.azurewebsites.net" -ForegroundColor White
 Write-Host ""
 Write-Host "Authentication:" -ForegroundColor Cyan
 Write-Host "  Username: demo" -ForegroundColor White
 Write-Host "  Password: demo123" -ForegroundColor White
 Write-Host ""
 Write-Host "Next Steps:" -ForegroundColor Cyan
-Write-Host "1. Test the application at: https://$CLIENT_URL" -ForegroundColor White
+Write-Host "1. Test the application at: https://$ClientAppName.azurewebsites.net" -ForegroundColor White
 Write-Host "2. Login with username: demo, password: demo123" -ForegroundColor White
 Write-Host "3. Monitor logs using Azure Portal or CLI" -ForegroundColor White
 Write-Host ""
 Write-Host "To view application logs, run:" -ForegroundColor Cyan
-Write-Host "az containerapp logs show --name $CLIENT_APP_NAME --resource-group $ResourceGroupName --follow" -ForegroundColor White
-Write-Host "az containerapp logs show --name $SERVER_APP_NAME --resource-group $ResourceGroupName --follow" -ForegroundColor White
+Write-Host "az webapp log tail --name $ClientAppName --resource-group $ResourceGroupName" -ForegroundColor White
+Write-Host "az webapp log tail --name $ServerAppName --resource-group $ResourceGroupName" -ForegroundColor White
 Write-Host ""
 Write-Host "==============================================================================" -ForegroundColor Green

@@ -1,9 +1,10 @@
 # Stage 1: Build
 FROM node:20-alpine AS builder
 WORKDIR /app
-COPY package.json package-lock.json ./
+COPY ./server/package.json ./package.json
+COPY ./server/package-lock.json ./package-lock.json
 RUN npm ci
-COPY . .
+COPY ./server/. .
 RUN npm run build
 
 # Stage 2: Production
@@ -11,8 +12,8 @@ FROM node:20-alpine
 WORKDIR /app
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
-COPY package.json .
-COPY .env .
+COPY ./server/package.json .
+COPY ./server/.env .
 # Copy required data/config directories
 COPY --from=builder /app/src/personas ./src/personas
 COPY --from=builder /app/src/prompts ./src/prompts
@@ -25,7 +26,7 @@ COPY --from=builder /app/src/util ./dist/util
 # Ensure data directory exists and is writable
 RUN mkdir -p ./data && chmod 777 ./data
 # Copy startup script
-COPY startup.sh .
+COPY ./server/startup.sh .
 RUN chmod +x startup.sh
 EXPOSE 5000
 CMD ["./startup.sh"]
