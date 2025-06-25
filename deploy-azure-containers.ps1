@@ -204,6 +204,10 @@ if (-not $acrExists) {
     exit 1
 }
 
+# Enable admin user for ACR (required for credential retrieval)
+Write-Info "Enabling admin user for Azure Container Registry (if not already enabled)"
+az acr update -n $AcrName --admin-enabled true
+
 # Get ACR login server
 Write-Info "Getting ACR login server"
 $ACR_LOGIN_SERVER = az acr show --name $AcrName --resource-group $ResourceGroupName --query "loginServer" -o tsv
@@ -281,9 +285,6 @@ Write-Info "Assigning Key Vault Secrets User role to managed identity"
 $KEYVAULT_RESOURCE_ID = az keyvault show --name $KeyVaultName --resource-group $ResourceGroupName --query "id" -o tsv
 az role assignment create --assignee $MANAGED_IDENTITY_PRINCIPAL_ID --role "Key Vault Secrets User" --scope $KEYVAULT_RESOURCE_ID
 
-# Set Key Vault access policy for legacy SDKs if needed
-az keyvault set-policy --name $KeyVaultName --object-id $MANAGED_IDENTITY_PRINCIPAL_ID --secret-permissions get list
-
 # =============================================================================
 # ASSIGN MANAGED IDENTITY TO APP SERVICES
 # =============================================================================
@@ -297,106 +298,10 @@ az webapp config appsettings set --name $ClientAppName --resource-group $Resourc
 az webapp config appsettings set --name $ServerAppName --resource-group $ResourceGroupName --settings "AZURE_CLIENT_ID=$MANAGED_IDENTITY_CLIENT_ID"
 
 # =============================================================================
-# BUILD AND PUSH DOCKER IMAGES
-# =============================================================================
-
-Write-Step "Building and Pushing Docker Images"
-
-# Build client image
-Write-Info "Building client image via ACR Build"
-az acr build --registry $AcrName --image "${CLIENT_IMAGE_NAME}:${CLIENT_IMAGE_TAG}" --file "client/Dockerfile" .
-
-# Build server image
-Write-Info "Building server image via ACR Build"
-az acr build --registry $AcrName --image "${SERVER_IMAGE_NAME}:${SERVER_IMAGE_TAG}" --file "server/Dockerfile" .
-
-# =============================================================================
-# DEPLOY CONTAINER APPS
-# =============================================================================
-
-Write-Step "Deploying Container Apps"
-
-# Deploy Client Container App
-Write-Info "Deploying Client Container App: $CLIENT_APP_NAME"
-az containerapp create `
-    --name $CLIENT_APP_NAME `
-    --resource-group $ResourceGroupName `
-    --environment $ContainerAppEnvironmentName `
-    --image "${ACR_LOGIN_SERVER}/${CLIENT_IMAGE_NAME}:${CLIENT_IMAGE_TAG}" `
-    --registry-server $ACR_LOGIN_SERVER `
-    --registry-identity $MANAGED_IDENTITY_ID `
-    --user-assigned $MANAGED_IDENTITY_ID `
-    --ingress external `
-    --target-port 80 `
-    --min-replicas 1 `
-    --max-replicas 2 `
-    --cpu 0.5 `
-    --memory 1.0Gi `
-    --env-vars "PORT=5173" "VITE_API_URL=$VITE_API_URL"
-
-# Deploy Server Container App
-Write-Info "Deploying Server Container App: $SERVER_APP_NAME"
-az containerapp create `
-    --name $SERVER_APP_NAME `
-    --resource-group $ResourceGroupName `
-    --environment $ContainerAppEnvironmentName `
-    --image "${ACR_LOGIN_SERVER}/${SERVER_IMAGE_NAME}:${SERVER_IMAGE_TAG}" `
-    --registry-server $ACR_LOGIN_SERVER `
-    --registry-identity $MANAGED_IDENTITY_ID `
-    --user-assigned $MANAGED_IDENTITY_ID `
-    --ingress external `
-    --target-port 3000 `
-    --min-replicas 1 `
-    --max-replicas 2 `
-    --cpu 0.5 `
-    --memory 1.0Gi `
-    --secrets "azure-openai-endpoint=keyvaultref:${KeyVaultName}.vault.azure.net/secrets/azure-openai-endpoint,identityref:$MANAGED_IDENTITY_ID" `
-             "azure-openai-key=keyvaultref:${KeyVaultName}.vault.azure.net/secrets/azure-openai-key,identityref:$MANAGED_IDENTITY_ID" `
-             "azure-openai-deployment=keyvaultref:${KeyVaultName}.vault.azure.net/secrets/azure-openai-deployment,identityref:$MANAGED_IDENTITY_ID" `
-             "azure-openai-model=keyvaultref:${KeyVaultName}.vault.azure.net/secrets/azure-openai-model,identityref:$MANAGED_IDENTITY_ID" `
-             "azure-speech-key=keyvaultref:${KeyVaultName}.vault.azure.net/secrets/azure-speech-key,identityref:$MANAGED_IDENTITY_ID" `
-             "azure-speech-region=keyvaultref:${KeyVaultName}.vault.azure.net/secrets/azure-speech-region,identityref:$MANAGED_IDENTITY_ID" `
-             "azure-ai-foundry-project-endpoint=keyvaultref:${KeyVaultName}.vault.azure.net/secrets/azure-ai-foundry-project-endpoint,identityref:$MANAGED_IDENTITY_ID" `
-             "azure-evaluation-agent-id=keyvaultref:${KeyVaultName}.vault.azure.net/secrets/azure-evaluation-agent-id,identityref:$MANAGED_IDENTITY_ID" `
-    --env-vars "PORT=5000" `
-               "USE_SEED_DATA_MODE=true" `
-               "DATABASE_PATH=/app/voice-ai-documents.db" `
-               "MESSAGE_WINDOW_SIZE=20" `
-               "NODE_ENV=production" `
-               "AUTH_ENABLED=true" `
-               "SESSION_SECRET=$SESSION_SECRET" `
-               "AUTH_USERS=$AUTH_USERS" `
-               "AZURE_STORAGE_ACCOUNT_NAME=$StorageAccountName" `
-               "CONTAINER_APP_NAME=$SERVER_APP_NAME" `
-               "AZURE_CLIENT_ID=$MANAGED_IDENTITY_CLIENT_ID" `
-               "SKIP_RESTORE=false" `
-               "AZURE_OPENAI_ENDPOINT=secretref:azure-openai-endpoint" `
-               "AZURE_OPENAI_KEY=secretref:azure-openai-key" `
-               "AZURE_OPENAI_DEPLOYMENT=secretref:azure-openai-deployment" `
-               "AZURE_OPENAI_MODEL=secretref:azure-openai-model" `
-               "AZURE_SPEECH_KEY=secretref:azure-speech-key" `
-               "AZURE_SPEECH_REGION=secretref:azure-speech-region" `
-               "AZURE_AI_FOUNDRY_PROJECT_ENDPOINT=secretref:azure-ai-foundry-project-endpoint" `
-               "AZURE_EVALUATION_AGENT_ID=secretref:azure-evaluation-agent-id"
-
-# Get server URL to update client
-$SERVER_URL = az containerapp show --name $SERVER_APP_NAME --resource-group $ResourceGroupName --query "properties.configuration.ingress.fqdn" -o tsv
-
-# Update VITE_API_URL with actual server URL after deployment
-Write-Info "Updating client app with correct API URL"
-$VITE_API_URL = "https://$SERVER_URL"
-az containerapp update `
-    --name $CLIENT_APP_NAME `
-    --resource-group $ResourceGroupName `
-    --set-env-vars "VITE_API_URL=$VITE_API_URL"
-# =============================================================================
 # RETRIEVE DEPLOYMENT INFORMATION
 # =============================================================================
 
 Write-Step "Deployment Complete - Retrieving Information"
-
-# Get Container App URLs
-$CLIENT_URL = az containerapp show --name $CLIENT_APP_NAME --resource-group $ResourceGroupName --query "properties.configuration.ingress.fqdn" -o tsv
 
 Write-Host "`n==============================================================================" -ForegroundColor Green
 Write-Host "DEPLOYMENT COMPLETED SUCCESSFULLY" -ForegroundColor Green
@@ -404,18 +309,16 @@ Write-Host "====================================================================
 Write-Host ""
 Write-Host "Resource Group: $ResourceGroupName" -ForegroundColor Yellow
 Write-Host "Location: $Location" -ForegroundColor Yellow
-Write-Host "Environment: $EnvironmentName" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "Existing Resources Used:" -ForegroundColor Yellow
 Write-Host "  Container Registry: $AcrName" -ForegroundColor White
 Write-Host "  Storage Account: $StorageAccountName" -ForegroundColor White
 Write-Host "  Key Vault: $KeyVaultName" -ForegroundColor White
-Write-Host "  Container Apps Environment: $ContainerAppEnvironmentName" -ForegroundColor White
 Write-Host ""
 Write-Host "Created Resources:" -ForegroundColor Yellow
 Write-Host "  Managed Identity: $MANAGED_IDENTITY_NAME" -ForegroundColor White
-Write-Host "  Client Container App: $CLIENT_APP_NAME" -ForegroundColor White
-Write-Host "  Server Container App: $SERVER_APP_NAME" -ForegroundColor White
+Write-Host "  Client Web App: $ClientAppName" -ForegroundColor White
+Write-Host "  Server Web App: $ServerAppName" -ForegroundColor White
 Write-Host ""
 Write-Host "Application URLs:" -ForegroundColor Cyan
 Write-Host "  Client:  https://$ClientAppName.azurewebsites.net" -ForegroundColor White

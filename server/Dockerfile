@@ -13,7 +13,7 @@ WORKDIR /app
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules ./node_modules
 COPY ./server/package.json .
-COPY ./server/.env .
+#COPY ./server/.env .
 # Copy required data/config directories
 COPY --from=builder /app/src/personas ./src/personas
 COPY --from=builder /app/src/prompts ./src/prompts
