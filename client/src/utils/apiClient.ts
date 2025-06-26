@@ -26,4 +26,23 @@ apiClient.interceptors.request.use(config => {
   return config;
 });
 
+// Attach x-session-id header from stored sessionId (fallback if cookie isn't stored)
+apiClient.interceptors.request.use(config => {
+  const sessionId = localStorage.getItem('sessionId');
+  if (sessionId) {
+    config.headers = config.headers || {};
+    config.headers['x-session-id'] = sessionId;
+  }
+  return config;
+});
+
+// On login response, store sessionId for future headers
+apiClient.interceptors.response.use(response => {
+  if (response.config.url?.endsWith('/api/auth/login') && response.data?.sessionId) {
+    localStorage.setItem('sessionId', response.data.sessionId);
+    apiClient.defaults.headers.common['x-session-id'] = response.data.sessionId;
+  }
+  return response;
+});
+
 export default apiClient;

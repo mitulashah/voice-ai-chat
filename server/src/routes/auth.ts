@@ -31,10 +31,11 @@ router.post('/login', async (req: Request, res: Response) => {
   // Set session cookie with SameSite=None in dev to allow cross-site requests
   res.cookie('sessionId', session.sessionId, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: true, // ensure Secure flag for cross-site cookies
     maxAge: authConfig.sessionDurationHours * 3600 * 1000,
     // Use SameSite=lax in dev for local cookie acceptance, use None in production for cross-site
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    path: '/',
   });
 
   res.json({ success: true, sessionId: session.sessionId });
