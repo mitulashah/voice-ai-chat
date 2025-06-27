@@ -14,7 +14,7 @@ import statsRouter from './routes/stats';
 import tokenRouter from './routes/token';
 import scenariosRouter from './routes/scenarios';
 import moodsRouter from './routes/moods';
-import { AgentEvaluationService, ConversationData, EvaluationProgress, EvaluationResult } from './services/agentEvaluationService';
+import { ConversationData, EvaluationResult } from './services/OpenAIEvaluationService';
 import cookieParser from 'cookie-parser';
 import { authMiddleware } from './middleware/authMiddleware';
 import { rateLimitMiddleware } from './middleware/rateLimitMiddleware';
@@ -92,7 +92,8 @@ app.use('/api/scenarios', scenariosRouter);
 app.use('/api/moods', moodsRouter);
 
 // Evaluation endpoints - inline implementation
-const evaluationService = new AgentEvaluationService();
+import { OpenAIEvaluationService } from './services/OpenAIEvaluationService';
+const evaluationService = new OpenAIEvaluationService();
 
 // POST /api/evaluation/analyze-simple - Simple JSON response version
 app.post('/api/evaluation/analyze-simple', async (req: any, res: any) => {

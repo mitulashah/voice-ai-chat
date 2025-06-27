@@ -133,6 +133,70 @@ export class PrompyLoader {  private static parseTemplate(filePath: string): Pro
       configuration: resolvedConfig
     };
   }
+  
+  public static loadTemplateFromPath(filePath: string, parameters?: Record<string, any>): { systemMessage: string; configuration: PrompyConfiguration } {
+    if (!fs.existsSync(filePath)) {
+      throw new Error(`Prompty template not found: ${filePath}`);
+    }
+    
+    const template = this.parseTemplate(filePath);
+    
+    if (parameters) {
+      // Render template with parameters
+      return this.renderTemplateContent(template, parameters);
+    }
+    
+    return {
+      systemMessage: template.content,
+      configuration: template.metadata.model.configuration
+    };
+  }
+
+  private static renderTemplateContent(
+    template: PrompyTemplate,
+    parameters: Record<string, any>
+  ): { systemMessage: string; configuration: PrompyConfiguration } {
+    // Simple template rendering (replace {{variable}} with values)
+    let renderedContent = template.content;
+    
+    // Handle conditional blocks {% if variable %}...{% endif %}
+    Object.keys(parameters).forEach(key => {
+      const value = parameters[key];
+      
+      // Replace {% if key %} blocks
+      const ifPattern = new RegExp(`{% if ${key} %}([\\s\\S]*?){% endif %}`, 'g');
+      if (value) {
+        renderedContent = renderedContent.replace(ifPattern, '$1');
+      } else {
+        renderedContent = renderedContent.replace(ifPattern, '');
+      }
+      
+      // Replace {{key}} placeholders with actual values
+      const placeholder = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
+      if (renderedContent.match(placeholder)) {
+        renderedContent = renderedContent.replace(placeholder, String(value || ''));
+      }
+    });
+    
+    // Clean up any remaining template syntax
+    renderedContent = renderedContent.replace(/{% if \w+ %}|{% endif %}/g, '');
+    const finalContent = renderedContent.replace(/{{[\w_]+}}/g, '');
+    
+    // Resolve environment variables in configuration
+    const resolvedConfig = { ...template.metadata.model.configuration };
+    Object.keys(resolvedConfig).forEach(key => {
+      const value = resolvedConfig[key as keyof PrompyConfiguration];
+      if (typeof value === 'string' && value.startsWith('${env:')) {
+        const envVar = value.slice(6, -1); // Remove ${env: and }
+        (resolvedConfig as any)[key] = process.env[envVar] || value;
+      }
+    });
+    
+    return {
+      systemMessage: finalContent.trim(),
+      configuration: resolvedConfig
+    };
+  }
 }
 
 export { PrompyTemplate, PrompyMetadata, PrompyConfiguration };
