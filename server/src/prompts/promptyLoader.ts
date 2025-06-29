@@ -32,7 +32,28 @@ interface PrompyTemplate {
   content: string;
 }
 
-export class PrompyLoader {  private static parseTemplate(filePath: string): PrompyTemplate {
+export class PrompyLoader {
+  // Public wrapper to render a template from a string (for DB-backed templates)
+  public static renderTemplateFromContent(
+    content: string,
+    name: string,
+    description: string,
+    parameters: Record<string, any>
+  ): { systemMessage: string; configuration: PrompyConfiguration } {
+    // Use a minimal metadata object for compatibility
+    const template: PrompyTemplate = {
+      metadata: {
+        name,
+        description,
+        authors: [],
+        model: { api: '', configuration: { type: 'custom' } },
+        parameters: {}
+      },
+      content
+    };
+    return this.renderTemplateContent(template, parameters);
+  }
+  private static parseTemplate(filePath: string): PrompyTemplate {
     const fileContent = fs.readFileSync(filePath, 'utf-8');
     
     // Split frontmatter and content - more robust parsing

@@ -140,6 +140,35 @@ export class TemplateManager {
       delete templateParameters.scenarioId;
     }
     
+    // Try to load template from the database first, then fallback to file
+    try {
+      // Use the singleton databaseServiceFactory to get the DocumentService
+      const { databaseServiceFactory } = await import('../services/database-service-factory');
+      const documentService = databaseServiceFactory.getDocumentService();
+      if (documentService && documentService.listTemplates) {
+        const allTemplates = await documentService.listTemplates();
+        // Normalize function: lowercase, replace dashes/underscores with spaces, trim
+        const normalize = (s: string) => (s || '').toLowerCase().replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+        const normalizedTemplateName = normalize(templateName);
+        // Try to match by normalized name or by id
+        const dbTemplate = allTemplates.find((t: any) => {
+          return (
+            normalize(t.name) === normalizedTemplateName ||
+            (t.id && normalize(t.id) === normalizedTemplateName)
+          );
+        });
+        if (dbTemplate && dbTemplate.prompt) {
+          // Use the prompt from the database
+          const rendered = PrompyLoader.renderTemplateFromContent(dbTemplate.prompt, dbTemplate.name, dbTemplate.description || '', templateParameters);
+          return rendered;
+        }
+        // Log for debugging if fallback is about to be used
+        console.warn(`[TemplateManager] No DB template matched for requested name/id: '${templateName}' (normalized: '${normalizedTemplateName}'). Falling back to file.`);
+      }
+    } catch (err) {
+      console.warn('Database template lookup failed, falling back to file:', err);
+    }
+    // Fallback to file-based template
     try {
       return PrompyLoader.renderTemplate(templateName, templateParameters);
     } catch (error) {

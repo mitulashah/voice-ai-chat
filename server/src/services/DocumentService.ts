@@ -183,16 +183,26 @@ export class DocumentService {
       throw new Error(`Template with id '${id}' not found`);
     }
 
-    const updated = { ...existing, ...updates, id }; // Ensure ID doesn't change
-    this.validateTemplate(updated);
-    
-    // Map prompt -> content for database storage
-    const dbTemplate = {
-      ...updated,
-      content: updated.prompt, // Map prompt -> content for database
-      prompt: undefined // Remove prompt field for database
+    // Always use the latest prompt value from updates, fallback to existing
+    const prompt = updates.prompt !== undefined ? updates.prompt : existing.prompt;
+    const updated: Template = {
+      ...existing,
+      ...updates,
+      id,
+      prompt: prompt || ''
     };
-    
+    this.validateTemplate(updated);
+
+    // Map prompt -> content for database storage, remove prompt field
+    const dbTemplate: any = {
+      ...updated,
+      content: updated.prompt,
+    };
+    // Remove prompt field if present
+    if ('prompt' in dbTemplate) {
+      dbTemplate.prompt = undefined;
+    }
+
     this.db.upsertDocument(
       id,
       'prompt_template',
@@ -201,7 +211,8 @@ export class DocumentService {
       '',
       new Date()
     );
-    
+
+    // Always return the correct shape (with prompt field)
     return updated;
   }
 
