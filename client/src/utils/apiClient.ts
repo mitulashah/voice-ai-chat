@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getItem, setItem } from '../utils/localStorage';
 
 // Runtime configuration from window.ENV (loaded from /config.js)
 declare global {
@@ -28,7 +29,8 @@ apiClient.interceptors.request.use(config => {
 
 // Attach x-session-id header from stored sessionId (fallback if cookie isn't stored)
 apiClient.interceptors.request.use(config => {
-  const sessionId = localStorage.getItem('sessionId');
+  // Use localStorage utility for sessionId
+  const sessionId = getItem<string>('sessionId');
   if (sessionId) {
     config.headers = config.headers || {};
     config.headers['x-session-id'] = sessionId;
@@ -39,7 +41,7 @@ apiClient.interceptors.request.use(config => {
 // On login response, store sessionId for future headers
 apiClient.interceptors.response.use(response => {
   if (response.config.url?.endsWith('/api/auth/login') && response.data?.sessionId) {
-    localStorage.setItem('sessionId', response.data.sessionId);
+    setItem('sessionId', response.data.sessionId);
     apiClient.defaults.headers.common['x-session-id'] = response.data.sessionId;
   }
   return response;

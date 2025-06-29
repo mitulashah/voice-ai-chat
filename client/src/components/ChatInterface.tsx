@@ -284,22 +284,18 @@ const ChatInterface: React.FC = () => {
     if (currentTemplate) {
       setMessages([{ role: 'system', content: currentTemplate.prompt, timestamp: Date.now() }]);
       setTotalTokens(0);
-      localStorage.removeItem('totalTokens');
     } else {
       setMessages([]);
       setTotalTokens(0);
-      localStorage.removeItem('totalTokens');
     }
   };// Clear chat but keep only the system prompt
   const handleClearChat = () => {
     if (currentTemplate) {
       setMessages([{ role: 'system', content: currentTemplate.prompt, timestamp: Date.now() }]);
       setTotalTokens(0);
-      localStorage.removeItem('totalTokens');
     } else {
       setMessages([]);
       setTotalTokens(0);
-      localStorage.removeItem('totalTokens');
     }
   };
 
