@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { Dialog, DialogTitle, DialogContent } from '@mui/material';
 import { useEvaluation } from '../context/EvaluationContext';
 import { copyToClipboard, buildConversationData, formatDuration } from '../utils/exportDialogUtils';
@@ -6,6 +6,7 @@ import { useCopySnackbar } from '../hooks/useCopySnackbar';
 import { parseExportData } from '../utils/exportDataParser';
 import type { ExportData } from '../utils/exportDataParser';
 import { useAccordionState } from '../hooks/useAccordionState';
+import { usePersonaScenario } from '../context/PersonaScenarioContext';
 import ExportDialogEvaluationContext from './ExportDialogEvaluationContext';
 import ExportDialogStatistics from './ExportDialogStatistics';
 import ExportDialogEvaluationCriteria from './ExportDialogEvaluationCriteria';
@@ -43,6 +44,7 @@ const ExportDialog: React.FC<ExportDialogProps> = ({ exportJson, onClose, onDown
     }
   }, [lastEvaluation, evaluationError, setPanels]);
 
+
   // Prepare markdown text for ReactMarkdown, ensure it's string
   const markdownText = lastEvaluation
     ? typeof lastEvaluation.markdown === 'string'
@@ -53,13 +55,28 @@ const ExportDialog: React.FC<ExportDialogProps> = ({ exportJson, onClose, onDown
   // Parse the export data with type safety
   const exportData: ExportData | null = parseExportData(exportJson);
 
+  // Access scenarios from context
+  const { scenarios } = usePersonaScenario();
+
   // Legacy support for old export format
   const totalTokens = exportData?.stats?.totalTokensUsed || exportData?.totalTokensUsed || 0;
   const messageCount = exportData?.conversation?.messageCount || exportData?.messageCount || 0;
   const durationMs = exportData?.stats?.totalDurationMs || exportData?.totalDurationMs || 0;
 
   // New comprehensive data
-  const context = exportData?.context || {};
+  // If context has scenarioId but not full scenario, look it up and add it
+  const context = useMemo(() => {
+    if (!exportData?.context) return {};
+    const ctx = { ...exportData.context };
+    if (!ctx.scenario && ctx.scenarioId && Array.isArray(scenarios)) {
+      const found = scenarios.find(s => s.id === ctx.scenarioId);
+      if (found) {
+        ctx.scenario = found;
+      }
+    }
+    return ctx;
+  }, [exportData?.context, scenarios]);
+
   const evaluationCriteria = exportData?.evaluationCriteria || {};
 
   // Inline hasUserMessages usage for displayDuration

@@ -46,7 +46,7 @@ const ExportDialogEvaluationContext: React.FC<EvaluationContextProps> = ({ expan
                   Scenario:
                 </Typography>
                 <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
-                  {context.scenario.title}
+                  {context.scenario.title || context.scenario.name || ''}
                 </Typography>
               </Box>
             )}
