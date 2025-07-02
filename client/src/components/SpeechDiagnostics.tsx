@@ -15,6 +15,7 @@ import {
 import { ExpandMore as ExpandMoreIcon } from '@mui/icons-material';
 import { fetchSpeechToken } from '../utils/speechApi';
 import * as SpeechSDK from 'microsoft-cognitiveservices-speech-sdk';
+import apiClient from '../utils/apiClient';
 
 interface DiagnosticResult {
   test: string;
@@ -22,8 +23,6 @@ interface DiagnosticResult {
   message: string;
   details?: any;
 }
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 const SpeechDiagnostics: React.FC = () => {
   const [results, setResults] = useState<DiagnosticResult[]>([]);
@@ -46,8 +45,8 @@ const SpeechDiagnostics: React.FC = () => {
     // Test 1: Check if server is reachable
     addResult({ test: 'Server Health Check', status: 'pending', message: 'Checking server connection...' });
     try {
-      const response = await fetch(`${API_BASE_URL}/api/health`);
-      const data = await response.json();
+      const response = await apiClient.get('/api/health');
+      const data = response.data;
       updateResult('Server Health Check', {
         status: 'success',
         message: `Server is running: ${data.message}`,
@@ -201,48 +200,36 @@ const SpeechDiagnostics: React.FC = () => {
       });
     }    // Test 5: Test speech recognition endpoint directly
     addResult({ test: 'Speech Recognition Endpoint', status: 'pending', message: 'Testing speech recognition endpoint...' });
-    try {      // Send empty audio data to test the endpoint structure (should fail gracefully)
-      const response = await fetch(`${API_BASE_URL}/api/speech/recognize`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ audioData: '' })
+    try {
+      // Send empty audio data to test the endpoint structure (should fail gracefully)
+      const response = await apiClient.post('/api/speech/recognize', { audioData: '' });
+      
+      // If we get here without error, the endpoint is working
+      updateResult('Speech Recognition Endpoint', {
+        status: 'success',
+        message: 'Speech recognition endpoint is reachable and processing requests',
+        details: response.data
       });
-      
-      const data = await response.json();
-      
-      if (response.ok) {
+    } catch (error: any) {
+      // For the speech recognition endpoint, we actually expect it to fail with empty audio
+      // A 400 or 500 error with a meaningful message indicates the endpoint is working correctly
+      if (error.response && error.response.status >= 400 && error.response.data?.error) {
         updateResult('Speech Recognition Endpoint', {
           status: 'success',
-          message: 'Speech recognition endpoint is reachable and processing requests',
-          details: data
+          message: 'Speech recognition endpoint is working (expected error for empty audio)',
+          details: {
+            status: error.response.status,
+            expectedBehavior: 'Endpoint correctly rejects empty audio data',
+            errorDetails: error.response.data
+          }
         });
       } else {
-        // For a properly functioning endpoint, we expect a 500 with specific error message
-        if (response.status === 500 && data.error) {
-          updateResult('Speech Recognition Endpoint', {
-            status: 'success',
-            message: 'Speech recognition endpoint is working (expected error for empty audio)',
-            details: {
-              status: response.status,
-              expectedBehavior: 'Endpoint correctly rejects empty audio data',
-              errorDetails: data
-            }
-          });
-        } else {
-          updateResult('Speech Recognition Endpoint', {
-            status: 'error',
-            message: `Unexpected response: ${response.status}`,
-            details: data
-          });
-        }
+        updateResult('Speech Recognition Endpoint', {
+          status: 'error',
+          message: `Speech recognition endpoint failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          details: error
+        });
       }
-    } catch (error) {
-      updateResult('Speech Recognition Endpoint', {
-        status: 'error',
-        message: `Speech recognition endpoint failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        details: error
-      });
     }
 
     // Test 6: Check browser console for any JavaScript errors

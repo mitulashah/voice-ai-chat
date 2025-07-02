@@ -6,8 +6,7 @@ import type {
   EvaluationProgress,
   ConnectionStatus
 } from './evaluation-types';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+import apiClient from '../utils/apiClient';
 
 interface EvaluationContextType {
   // State
@@ -61,18 +60,9 @@ export const EvaluationProvider: React.FC<EvaluationProviderProps> = ({ children
         stage: 'analyzing',
         message: 'Analyzing conversation with Azure AI Agent...',
         percentage: 25
-      });      const response = await fetch(`${API_BASE_URL}/api/evaluation/analyze-simple`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(conversationData),
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      const response = await apiClient.post('/api/evaluation/analyze-simple', conversationData);
 
       setEvaluationProgress({
         stage: 'generating',
@@ -80,7 +70,7 @@ export const EvaluationProvider: React.FC<EvaluationProviderProps> = ({ children
         percentage: 75
       });
 
-      const data: EvaluationResponse = await response.json();
+      const data: EvaluationResponse = response.data;
 
       if (!data.success || !data.result) {
         throw new Error(data.error || 'Evaluation failed');
@@ -121,15 +111,9 @@ export const EvaluationProvider: React.FC<EvaluationProviderProps> = ({ children
   }, []);
   const testConnection = useCallback(async (): Promise<boolean> => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/evaluation/test`, {
-        credentials: 'include'
-      });
+      const response = await apiClient.get('/api/evaluation/test');
       
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data: ConnectionStatus = await response.json();
+      const data: ConnectionStatus = response.data;
       setConnectionStatus(data);
       return data.connected;
     } catch (err) {
